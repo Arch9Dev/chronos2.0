@@ -1,6 +1,5 @@
-<script lang="ts">
-</script>
+<svelte:head>
+  <link rel="icon" type="image/png" href="/favicon.png" />
+</svelte:head>
 
-<div class="page-container">
 <slot />
-</div>
