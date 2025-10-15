@@ -147,10 +147,9 @@
   <header class="calendar-header">
     <h1>Welcome, {user?.username}</h1>
     <nav class="calendar-nav">
-      <a href="/calendar">Main Calendar</a>
-      <a href="/calendar/view">View Calendars</a>
-      <a href="/tasks/view">View Tasks</a>
-      <a href="/tasks/upcoming">Upcoming</a>
+      <a href="/calendar">Calendar</a>
+      <a href="/view">View Tasks</a>
+      <a href="/settings">Settings</a>
     </nav>
     <img src="/logo.svg" alt="Logo" class="chronos-logo" />
   </header>
@@ -237,6 +236,11 @@
 </main>
 
 <style>
+  :global(*) {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+  }
   * {
     box-sizing: border-box;
   }

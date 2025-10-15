@@ -85,6 +85,12 @@
 </main>
 
 <style>
+
+  :global(*) {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+  }
   /* Use same styles as login page for consistency */
   .login-page {
     display: flex;

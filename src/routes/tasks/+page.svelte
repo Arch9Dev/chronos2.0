@@ -30,11 +30,16 @@
         .from('profiles')
         .select('username')
         .eq('id', currentUser.id)
-        .single();
+        .maybeSingle();
   
       if (profileError) {
         error = profileError.message;
         return;
+      }
+
+      if (!profile) {
+        console.warn('No profile found for user — redirecting or creating one');
+        // optionally create a profile automatically here
       }
   
       user = { ...currentUser, username: profile?.username };
@@ -271,6 +276,11 @@
   </main>
   
   <style>
+    :global(*) {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
     * {
       box-sizing: border-box;
     }

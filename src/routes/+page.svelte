@@ -53,6 +53,7 @@
 <nav class="navbar">
   <div class="nav-container">
     <div class="nav-links">
+      <button on:click={() => scrollToSection("home")}>Home</button>
       <button on:click={() => scrollToSection("features")}>Features</button>
       <button on:click={() => scrollToSection("pricing")}>Pricing</button>
       <button on:click={() => scrollToSection("contact")}>Contact</button>
