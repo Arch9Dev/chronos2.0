@@ -1,16 +1,5 @@
-<script lang="ts">
-    // This layout is specific for signup pages
-  </script>
-  
-  <slot />
-  
-  <style>
-    /* This ensures no navbar or extra padding from global layout */
-    :global(body) {
-      margin: 0;
-      padding: 0;
-    }
-  
-    /* Optional: Smooth scrolling */
-  </style>
-  
+<svelte:head>
+  <link rel="icon" type="image/png" href="/favicon.png" />
+</svelte:head>
+
+<slot />
