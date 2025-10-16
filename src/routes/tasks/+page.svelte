@@ -70,6 +70,7 @@
         const deadlineDate = new Date(deadline);
   
         const taskData = {
+          user_id: user.id,
           title: title.trim(),
           description: description.trim() || null,
           deadline: deadlineDate.toISOString(),

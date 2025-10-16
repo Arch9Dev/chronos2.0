@@ -120,6 +120,7 @@
     const { data: tasksData, error: taskError } = await supabase
       .from('tasks')
       .select('*')
+      .eq('user_id', currentUser.id)
       .in('calendar_id', calendars.map((c) => c.id));
 
     if (taskError) {
@@ -131,9 +132,7 @@
   });
 
   // --- Reactive: regenerate calendar when tasks or date change ---
-  $: if (tasks.length > 0 || currentDate) {
-    generateCalendar(currentDate);
-  }
+  $: generateCalendar(currentDate);
 
   // --- Create rows of 7 days for display ---
   $: calendarRows = calendarDays.reduce((rows, day, index) => {
