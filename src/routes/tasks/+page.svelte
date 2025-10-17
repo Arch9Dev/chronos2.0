@@ -217,20 +217,7 @@
               <option value="high">High Priority</option>
             </select>
           </div>
-  
-          <div class="form-group">
-            <label for="calendar">Calendar (Optional)</label>
-            <select
-              id="calendar"
-              bind:value={selectedCalendar}
-              class="form-select"
-            >
-              <option value="">No calendar</option>
-              {#each calendars as calendar}
-                <option value={calendar.id}>{calendar.name}</option>
-              {/each}
-            </select>
-          </div>
+
   
           <div class="form-group">
             <label for="tags">
