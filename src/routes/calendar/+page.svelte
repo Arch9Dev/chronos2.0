@@ -10,19 +10,21 @@
   let currentDate = new Date();
   let calendarDays: Array<{ date: number; isCurrentMonth: boolean; isToday: boolean; tasks?: any[] }> = [];
 
+
+
   const monthNames = [
     'January', 'February', 'March', 'April', 'May', 'June',
     'July', 'August', 'September', 'October', 'November', 'December'
   ];
 
-  function generateCalendar(date: Date) {
+  // ✅ Generate calendar with attached tasks
+  function generateCalendar(date: Date, taskList = tasks) {
     const year = date.getFullYear();
     const month = date.getMonth();
     const today = new Date();
-
     const firstDay = new Date(year, month, 1);
     const lastDay = new Date(year, month + 1, 0);
-    const firstDayOfWeek = (firstDay.getDay() + 6) % 7;
+    const firstDayOfWeek = (firstDay.getDay() + 6) % 7; // Monday start
 
     const days = [];
     const prevMonth = new Date(year, month, 0);
@@ -44,7 +46,7 @@
         today.getMonth() === month &&
         today.getDate() === day;
 
-      const dayTasks = tasks.filter((t) => {
+      const dayTasks = (taskList ?? []).filter((t) => {
         if (!t.deadline) return false;
         const due = new Date(t.deadline);
         return (
@@ -62,7 +64,7 @@
       });
     }
 
-    // Next month filler days
+    // Fillers for next month
     const remainingCells = 42 - days.length;
     for (let day = 1; day <= remainingCells; day++) {
       days.push({
@@ -76,19 +78,18 @@
     calendarDays = days;
   }
 
+  // ✅ Navigation
   function previousMonth() {
     currentDate = new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1);
   }
-
   function nextMonth() {
     currentDate = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1);
   }
-
   function goToToday() {
     currentDate = new Date();
   }
 
-  // --- Fetch user, calendars, and tasks ---
+  // ✅ Fetch user, calendars, and tasks
   onMount(async () => {
     const { data: { user: currentUser }, error: authError } = await supabase.auth.getUser();
     if (authError || !currentUser) {
@@ -96,20 +97,13 @@
       return;
     }
 
-    const { data: profile, error: profileError } = await supabase
-      .from('profiles')
-      .select('username')
-      .eq('id', currentUser.id)
-      .single();
+    user = currentUser;
 
-    if (profileError) {
-      error = profileError.message;
-      return;
-    }
+    const { data: calendarsData, error: calError } = await supabase
+      .from('calendars')
+      .select('*')
+      .eq('user_id', currentUser.id);
 
-    user = { ...currentUser, username: profile?.username };
-
-    const { data: calendarsData, error: calError } = await supabase.from('calendars').select('*');
     if (calError) {
       error = calError.message;
       return;
@@ -117,10 +111,15 @@
 
     calendars = calendarsData ?? [];
 
+    if (calendars.length === 0) {
+      tasks = [];
+      generateCalendar(currentDate);
+      return;
+    }
+
     const { data: tasksData, error: taskError } = await supabase
       .from('tasks')
-      .select('*')
-      .eq('user_id', currentUser.id)
+      .select('id, title, description, deadline, priority, completed, calendar_id')
       .in('calendar_id', calendars.map((c) => c.id));
 
     if (taskError) {
@@ -128,23 +127,34 @@
       return;
     }
 
-    tasks = tasksData ?? [];
+    tasks = (tasksData ?? []).map((t) => ({
+      ...t,
+      deadline: t.deadline ? new Date(t.deadline) : null
+    }));
+
+    // ✅ Force calendar refresh once tasks are ready
+    generateCalendar(currentDate);
   });
 
-  // --- Reactive: regenerate calendar when tasks or date change ---
-  $: generateCalendar(currentDate);
+  // ✅ Regenerate when month OR tasks change
+  $: generateCalendar(currentDate, tasks);
 
-  // --- Create rows of 7 days for display ---
+  // ✅ Split into weeks
   $: calendarRows = calendarDays.reduce((rows, day, index) => {
     if (index % 7 === 0) rows.push([]);
     rows[rows.length - 1].push(day);
     return rows;
   }, [] as Array<Array<{ date: number; isCurrentMonth: boolean; isToday: boolean; tasks?: any[] }>>);
+
+  // ✅ Task click preview
+  function viewTask(task: any) {
+    alert(`📝 ${task.title}\n\n${task.description || 'No description.'}`);
+  }
 </script>
 
 <main class="calendar-page">
   <header class="calendar-header">
-    <h1>Welcome, {user?.username}</h1>
+    <h1>Welcome, {user?.email}</h1>
     <nav class="calendar-nav">
       <a href="/calendar">Calendar</a>
       <a href="/view">View Tasks</a>
@@ -184,13 +194,8 @@
       <table class="calendar-table">
         <thead>
           <tr>
-            <th>Mon</th>
-            <th>Tue</th>
-            <th>Wed</th>
-            <th>Thu</th>
-            <th>Fri</th>
-            <th>Sat</th>
-            <th>Sun</th>
+            <th>Mon</th><th>Tue</th><th>Wed</th><th>Thu</th>
+            <th>Fri</th><th>Sat</th><th>Sun</th>
           </tr>
         </thead>
         <tbody>
@@ -204,13 +209,20 @@
                 >
                   <div class="day-content">
                     <span class="day-number">{day.date}</span>
+
                     {#if day.tasks && day.tasks.length > 0}
                       <ul class="task-list">
                         {#each day.tasks as task}
-                          <li class="task-item {task.priority}">
+                          <button
+                            type="button"
+                            class="task-item {task.priority} {task.completed ? 'completed' : ''}"
+                            title={task.description}
+                            on:click={() => viewTask(task)}
+                            on:keydown={(e) => (e.key === 'Enter' || e.key === ' ') && viewTask(task)}
+                          >
                             <span class="task-dot"></span>
                             <span class="task-text">{task.title}</span>
-                          </li>
+                          </button>
                         {/each}
                       </ul>
                     {/if}
