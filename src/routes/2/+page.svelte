@@ -8,7 +8,7 @@
 	let error: string | null = null;
 	let loading = true;
 	let currentDate = new Date();
-	let selectedTask: any = null; // for pop-up modal
+	let selectedTask: any = null;
 
 	onMount(async () => {
 		const { data: { user: currentUser }, error: authError } = await supabase.auth.getUser();
@@ -65,12 +65,15 @@
 		const daysInMonth = lastDay.getDate();
 		const startDay = firstDay.getDay();
 
-		const days: { date: Date; tasks: any[] }[] = [];
+		const days: { date: Date; tasks: any[]; currentMonth: boolean }[] = [];
 
+		// Days from the previous month
 		for (let i = 0; i < startDay; i++) {
-			days.push({ date: new Date(year, month, i - startDay + 1), tasks: [] });
+			const date = new Date(year, month, i - startDay + 1);
+			days.push({ date, tasks: [], currentMonth: false });
 		}
 
+		// Current month days
 		for (let d = 1; d <= daysInMonth; d++) {
 			const dateObj = new Date(year, month, d);
 			const dayTasks = tasks.filter(t => {
@@ -81,7 +84,13 @@
 					taskDate.getDate() === d
 				);
 			});
-			days.push({ date: dateObj, tasks: dayTasks });
+			days.push({ date: dateObj, tasks: dayTasks, currentMonth: true });
+		}
+
+		const totalCells = Math.ceil(days.length / 7) * 7;
+		for (let i = days.length; i < totalCells; i++) {
+			const date = new Date(year, month, i - startDay + 1);
+			days.push({ date, tasks: [], currentMonth: false });
 		}
 
 		return days;
@@ -128,9 +137,10 @@
 
 			<div class="calendar-grid">
 				{#each getCalendarDays() as day}
-					<div class="day-cell {isToday(day.date) ? 'today' : ''}">
+					<div class="day-cell {isToday(day.date) ? 'today' : ''} {day.currentMonth ? '' : 'other-month'}">
 						<div class="date">{day.date.getDate()}</div>
-						{#if day.tasks.length > 0}
+			
+						{#if day.currentMonth && day.tasks.length > 0}
 							<ul class="task-list">
 								{#each day.tasks.slice(0, 3) as task}
 									<li>
@@ -186,6 +196,15 @@
 			</div>
 		</div>
 	{/if}
+
+	<aside class="task-controls">
+		<a class="add-task-btn" href="/tasks">
+		  <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+			<path d="M10 4V16M4 10H16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+		  </svg>
+		  Add New Task
+		</a>
+	</aside>
 </main>
 
 <style>
@@ -257,39 +276,35 @@
         max-height: 40px;
         object-fit: contain;
     }
-	.add-task-btn {
-		background: #323e55;
-		color: white;
-		padding: 0.6rem 1.2rem;
-		border-radius: 8px;
-		border: none;
-		cursor: pointer;
-		font-weight: 600;
-	}
-
-	.add-task-btn:hover {
-		background: #2b3548;
-	}
 
 	.calendar-controls {
 		display: flex;
 		justify-content: center;
 		align-items: center;
 		gap: 2rem;
-		padding: 1.5rem 0;
+		background: #DBA15C;
+		padding: 1rem 2rem;
+		width: 100%;
+		max-width: 1000px;
+		margin: 1.5rem auto 0 auto;
+		box-shadow: 0 4px 10px rgba(0, 0, 0, 0.15);
+		border-top-left-radius: 16px;
+		border-top-right-radius: 16px;
 	}
 
 	.nav-btn {
-		background: #323e55;
+		background: rgba(255, 255, 255, 0.15);
 		color: white;
 		border: none;
 		padding: 0.5rem 1rem;
-		border-radius: 6px;
+		border-radius: 8px;
 		cursor: pointer;
-		font-weight: 500;
+		font-weight: 600;
+		backdrop-filter: blur(4px);
+		transition: all 0.2s ease;
 	}
 
-	.nav-btn:hover {
+	.nav-btn:hover { 
 		background: #2b3548;
 	}
 
@@ -297,10 +312,14 @@
 		width: 100%;
 		max-width: 1000px;
 		margin: 0 auto;
-		background: rgba(255, 255, 255, 0.85);
-		border-radius: 16px;
-		padding: 1.5rem;
-		box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+		background: white;
+		border-bottom-left-radius: 16px;
+		border-bottom-right-radius: 16px;
+		padding: 0;
+		border: 1px solid #e5e7eb;
+		border-top: none;
+		box-shadow: 0 6px 20px rgba(0, 0, 0, 0.1);
+		overflow: hidden;
 	}
 
 	.calendar-header-row {
@@ -308,39 +327,102 @@
 		grid-template-columns: repeat(7, 1fr);
 		text-align: center;
 		font-weight: 600;
-		margin-bottom: 0.5rem;
+		color: #323e55;
+		font-size: 0.9rem;
+		padding: 0.75rem 0;
+		background: #f7f4f0;
+		border-bottom: 1px solid #e5e7eb;
+		text-transform: uppercase;
+		letter-spacing: 0.03em;
 	}
 
 	.calendar-grid {
 		display: grid;
 		grid-template-columns: repeat(7, 1fr);
-		gap: 0.5rem;
+		border-left: 1px solid #e5e7eb;
+		border-bottom: 1px solid #e5e7eb;
 	}
 
 	.day-cell {
-		background: white;
-		border-radius: 10px;
-		padding: 0.5rem;
-		min-height: 120px;
+		border-top: 1px solid #e5e7eb;
+		border-right: 1px solid #e5e7eb;
+		padding: 0.75rem;
+		min-height: 100px;
 		display: flex;
 		flex-direction: column;
-		box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+		align-items: flex-start;
+		justify-content: flex-start;
+		background: #ffffff;
+		transition: background 0.2s ease;
+	}
+		
+	.day-cell:hover {
+		background: #f9fafb;
+	}
+	.day-cell.today {
+		background: #f0f7ff;
+		position: relative;
+		box-shadow: inset 0 0 0 2px #323e55;
 	}
 
-	.day-cell.today {
-		border: 2px solid #323e55;
+	.day-cell.other-month {
+		background: #fafafa;
+		color: #d1d5db;
+		pointer-events: none;
+	}
+
+	.task-list {
+		list-style: none;
+		padding: 0;
+		margin: 0;
+		width: 100%;
 	}
 
 	.task-item {
 		all: unset;
 		display: block;
-		width: 100%;
-		text-align: left;
+		font-size: 0.8rem;
+		color: #374151;
+		padding: 0.2rem 0;
 		cursor: pointer;
-		border-radius: 6px;
-		padding: 0.25rem 0.5rem;
-		font-size: 0.85rem;
+		border-radius: 4px;
 	}
+
+	.task-controls {
+		display: flex;
+		justify-content: flex-end;
+		align-items: center;
+		width: 100%;
+		max-width: 1000px;
+		margin: 1.5rem auto 0 auto;
+		padding-right: relative;
+		z-index: 2;
+	}
+
+	.add-task-btn {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.5rem;
+		background-color: #323e55;
+		color: #ffffff;
+		text-decoration: none;
+		font-weight: 600;
+		padding: 0.6rem 1.25rem;
+		border-radius: 8px;
+		box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+		transition: all 0.2s ease;
+	}
+
+	.add-task-btn:hover {
+		background-color: #3f4c68; /* lighter on hover */
+		transform: translateY(-1px);
+		box-shadow: 0 4px 10px rgba(0, 0, 0, 0.15);
+	}
+
+	.add-task-btn:active {
+		transform: translateY(0);
+	}
+
 
 	.task-item.low { background: #e0f2fe; color: #0369a1; }
 	.task-item.medium { background: #fef9c3; color: #92400e; }
@@ -352,7 +434,6 @@
 		outline-offset: 2px;
 	}
 
-	/* 🌙 Modal styles */
 	.modal-overlay {
 		position: fixed;
 		inset: 0;

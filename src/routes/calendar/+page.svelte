@@ -1,607 +1,513 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
-  import { supabase } from '$lib/supabase';
-  import { goto } from '$app/navigation';
+	import { onMount } from 'svelte';
+	import { supabase } from '$lib/supabase';
+	import { goto } from '$app/navigation';
 
-  let user: any = null;
-  let calendars: any[] = [];
-  let tasks: any[] = [];
-  let error: string | null = null;
-  let currentDate = new Date();
-  let calendarDays: Array<{ date: number; isCurrentMonth: boolean; isToday: boolean; tasks?: any[] }> = [];
+	let user: any = null;
+	let tasks: any[] = [];
+	let error: string | null = null;
+	let loading = true;
+	let currentDate = new Date();
+	let selectedTask: any = null;
 
+	onMount(async () => {
+		const { data: { user: currentUser }, error: authError } = await supabase.auth.getUser();
+		if (authError || !currentUser) {
+			goto('/login');
+			return;
+		}
+		user = currentUser;
+		await loadTasks();
+	});
 
+	async function loadTasks() {
+		const { data: fetchedTasks, error: fetchError } = await supabase
+			.from('tasks')
+			.select('*')
+			.order('deadline', { ascending: true });
 
-  const monthNames = [
-    'January', 'February', 'March', 'April', 'May', 'June',
-    'July', 'August', 'September', 'October', 'November', 'December'
-  ];
+		if (fetchError) {
+			error = fetchError.message;
+		} else {
+			tasks = fetchedTasks || [];
+		}
+		loading = false;
+	}
 
-  // ✅ Generate calendar with attached tasks
-  function generateCalendar(date: Date, taskList = tasks) {
-    const year = date.getFullYear();
-    const month = date.getMonth();
-    const today = new Date();
-    const firstDay = new Date(year, month, 1);
-    const lastDay = new Date(year, month + 1, 0);
-    const firstDayOfWeek = (firstDay.getDay() + 6) % 7; // Monday start
+	async function markComplete(id: number) {
+		await supabase.from('tasks').update({ completed: true }).eq('id', id);
+		selectedTask = null;
+		await loadTasks();
+	}
 
-    const days = [];
-    const prevMonth = new Date(year, month, 0);
+	async function deleteTask(id: number) {
+		if (confirm('Are you sure you want to delete this task?')) {
+			await supabase.from('tasks').delete().eq('id', id);
+			selectedTask = null;
+			await loadTasks();
+		}
+	}
 
-    // Previous month filler days
-    for (let i = firstDayOfWeek - 1; i >= 0; i--) {
-      days.push({
-        date: prevMonth.getDate() - i,
-        isCurrentMonth: false,
-        isToday: false,
-        tasks: []
-      });
-    }
+	function getMonthName(date: Date) {
+		return date.toLocaleString('default', { month: 'long', year: 'numeric' });
+	}
 
-    // Current month days
-    for (let day = 1; day <= lastDay.getDate(); day++) {
-      const isToday =
-        today.getFullYear() === year &&
-        today.getMonth() === month &&
-        today.getDate() === day;
+	function changeMonth(offset: number) {
+		currentDate = new Date(currentDate.getFullYear(), currentDate.getMonth() + offset, 1);
+	}
 
-      const dayTasks = (taskList ?? []).filter((t) => {
-        if (!t.deadline) return false;
-        const due = new Date(t.deadline);
-        return (
-          due.getFullYear() === year &&
-          due.getMonth() === month &&
-          due.getDate() === day
-        );
-      });
+	function getCalendarDays() {
+		const year = currentDate.getFullYear();
+		const month = currentDate.getMonth();
 
-      days.push({
-        date: day,
-        isCurrentMonth: true,
-        isToday,
-        tasks: dayTasks
-      });
-    }
+		const firstDay = new Date(year, month, 1);
+		const lastDay = new Date(year, month + 1, 0);
+		const daysInMonth = lastDay.getDate();
+		const startDay = firstDay.getDay();
 
-    // Fillers for next month
-    const remainingCells = 42 - days.length;
-    for (let day = 1; day <= remainingCells; day++) {
-      days.push({
-        date: day,
-        isCurrentMonth: false,
-        isToday: false,
-        tasks: []
-      });
-    }
+		const days: { date: Date; tasks: any[]; currentMonth: boolean }[] = [];
 
-    calendarDays = days;
-  }
+		// Days from the previous month
+		for (let i = 0; i < startDay; i++) {
+			const date = new Date(year, month, i - startDay + 1);
+			days.push({ date, tasks: [], currentMonth: false });
+		}
 
-  // ✅ Navigation
-  function previousMonth() {
-    currentDate = new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1);
-  }
-  function nextMonth() {
-    currentDate = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1);
-  }
-  function goToToday() {
-    currentDate = new Date();
-  }
+		// Current month days
+		for (let d = 1; d <= daysInMonth; d++) {
+			const dateObj = new Date(year, month, d);
+			const dayTasks = tasks.filter(t => {
+				const taskDate = new Date(t.deadline);
+				return (
+					taskDate.getFullYear() === year &&
+					taskDate.getMonth() === month &&
+					taskDate.getDate() === d
+				);
+			});
+			days.push({ date: dateObj, tasks: dayTasks, currentMonth: true });
+		}
 
-  // ✅ Fetch user, calendars, and tasks
-  onMount(async () => {
-    const { data: { user: currentUser }, error: authError } = await supabase.auth.getUser();
-    if (authError || !currentUser) {
-      goto('/login');
-      return;
-    }
+		const totalCells = Math.ceil(days.length / 7) * 7;
+		for (let i = days.length; i < totalCells; i++) {
+			const date = new Date(year, month, i - startDay + 1);
+			days.push({ date, tasks: [], currentMonth: false });
+		}
 
-    user = currentUser;
+		return days;
+	}
 
-    const { data: calendarsData, error: calError } = await supabase
-      .from('calendars')
-      .select('*')
-      .eq('user_id', currentUser.id);
-
-    if (calError) {
-      error = calError.message;
-      return;
-    }
-
-    calendars = calendarsData ?? [];
-
-    if (calendars.length === 0) {
-      tasks = [];
-      generateCalendar(currentDate);
-      return;
-    }
-
-    const { data: tasksData, error: taskError } = await supabase
-      .from('tasks')
-      .select('id, title, description, deadline, priority, completed, calendar_id')
-      .in('calendar_id', calendars.map((c) => c.id));
-
-    if (taskError) {
-      error = taskError.message;
-      return;
-    }
-
-    tasks = (tasksData ?? []).map((t) => ({
-      ...t,
-      deadline: t.deadline ? new Date(t.deadline) : null
-    }));
-
-    // ✅ Force calendar refresh once tasks are ready
-    generateCalendar(currentDate);
-  });
-
-  // ✅ Regenerate when month OR tasks change
-  $: generateCalendar(currentDate, tasks);
-
-  // ✅ Split into weeks
-  $: calendarRows = calendarDays.reduce((rows, day, index) => {
-    if (index % 7 === 0) rows.push([]);
-    rows[rows.length - 1].push(day);
-    return rows;
-  }, [] as Array<Array<{ date: number; isCurrentMonth: boolean; isToday: boolean; tasks?: any[] }>>);
-
-  // ✅ Task click preview
-  function viewTask(task: any) {
-    alert(`📝 ${task.title}\n\n${task.description || 'No description.'}`);
-  }
+	function isToday(date: Date) {
+		const today = new Date();
+		return (
+			date.getDate() === today.getDate() &&
+			date.getMonth() === today.getMonth() &&
+			date.getFullYear() === today.getFullYear()
+		);
+	}
 </script>
 
 <main class="calendar-page">
-  <header class="calendar-header">
-    <h1>Welcome, {user?.email}</h1>
-    <nav class="calendar-nav">
-      <a href="/calendar">Calendar</a>
-      <a href="/view">View Tasks</a>
-      <a href="/settings">Settings</a>
-    </nav>
-    <img src="/logo.svg" alt="Logo" class="chronos-logo" />
-  </header>
+	<header class="calendar-header">
+        <h1>Welcome, {user?.email}</h1>
+        <nav class="calendar-nav">
+          <a href="/calendar">Calendar</a>
+          <a href="/view">View Tasks</a>
+          <a href="/settings">Settings</a>
+        </nav>
+        <img src="/logo.svg" alt="Logo" class="chronos-logo" />
+    </header>
 
-  <section class="calendar-body">
-    <aside class="task-key">
-      <h3>Task Priority</h3>
-      <ul>
-        <li><span class="dot low"></span>Low Priority</li>
-        <li><span class="dot medium"></span>Medium Priority</li>
-        <li><span class="dot high"></span>High Priority</li>
-      </ul>
-    </aside>
+	<section class="calendar-controls">
+		<button class="nav-btn" on:click={() => changeMonth(-1)}>← Prev</button>
+		<h2 class="month-label">{getMonthName(currentDate)}</h2>
+		<button class="nav-btn" on:click={() => changeMonth(1)}>Next →</button>
+	</section>
 
-    <div class="calendar-container">
-      <div class="calendar-header-section">
-        <h2 class="calendar-title">Calendar</h2>
-        <div class="month-navigation">
-          <button class="nav-btn" on:click={previousMonth} aria-label="Previous month">
-            <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-              <path d="M12 16L6 10L12 4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-            </svg>
-          </button>
-          <span class="month-display">{monthNames[currentDate.getMonth()]} {currentDate.getFullYear()}</span>
-          <button class="nav-btn" on:click={nextMonth} aria-label="Next month">
-            <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-              <path d="M8 4L14 10L8 16" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-            </svg>
-          </button>
-        </div>
-      </div>
+	{#if loading}
+		<div class="loading">Loading calendar...</div>
+	{:else if error}
+		<div class="error">{error}</div>
+	{:else}
+		<section class="calendar-container">
+			<div class="calendar-header-row">
+				{#each ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'] as day}
+					<div class="weekday">{day}</div>
+				{/each}
+			</div>
 
-      <table class="calendar-table">
-        <thead>
-          <tr>
-            <th>Mon</th><th>Tue</th><th>Wed</th><th>Thu</th>
-            <th>Fri</th><th>Sat</th><th>Sun</th>
-          </tr>
-        </thead>
-        <tbody>
-          {#each calendarRows as row}
-            <tr>
-              {#each row as day}
-                <td
-                  class="calendar-day"
-                  class:other-month={!day.isCurrentMonth}
-                  class:today={day.isToday}
-                >
-                  <div class="day-content">
-                    <span class="day-number">{day.date}</span>
+			<div class="calendar-grid">
+				{#each getCalendarDays() as day}
+					<div class="day-cell {isToday(day.date) ? 'today' : ''} {day.currentMonth ? '' : 'other-month'}">
+						<div class="date">{day.date.getDate()}</div>
+			
+						{#if day.currentMonth && day.tasks.length > 0}
+							<ul class="task-list">
+								{#each day.tasks.slice(0, 3) as task}
+									<li>
+										<button
+											class="task-item {task.priority} {task.completed ? 'done' : ''}"
+											type="button"
+											on:click={() => selectedTask = task}>
+											{task.title}
+										</button>
+									</li>
+								{/each}
+								{#if day.tasks.length > 3}
+									<li class="task-more">+{day.tasks.length - 3} more</li>
+								{/if}
+							</ul>
+						{/if}
+					</div>
+				{/each}
+			</div>
+		</section>
+	{/if}
 
-                    {#if day.tasks && day.tasks.length > 0}
-                      <ul class="task-list">
-                        {#each day.tasks as task}
-                          <button
-                            type="button"
-                            class="task-item {task.priority} {task.completed ? 'completed' : ''}"
-                            title={task.description}
-                            on:click={() => viewTask(task)}
-                            on:keydown={(e) => (e.key === 'Enter' || e.key === ' ') && viewTask(task)}
-                          >
-                            <span class="task-dot"></span>
-                            <span class="task-text">{task.title}</span>
-                          </button>
-                        {/each}
-                      </ul>
-                    {/if}
-                  </div>
-                </td>
-              {/each}
-            </tr>
-          {/each}
-        </tbody>
-      </table>
-    </div>
+	<!-- 🪟 Modal for viewing/editing a task -->
+	{#if selectedTask}
+		<div
+			class="modal-overlay"
+			role="button"
+			tabindex="0"
+			on:click={() => selectedTask = null}
+			on:keydown={(e) => (e.key === 'Enter' || e.key === ' ') ? selectedTask = null : null}>
+			<!-- svelte-ignore a11y_click_events_have_key_events -->
+			<!-- svelte-ignore a11y_no_static_element_interactions -->
+			<div class="task-modal" on:click|stopPropagation>
+				<h2>{selectedTask.title}</h2>
+				<p class="desc">{selectedTask.description || "No description provided."}</p>
 
-    <aside class="task-controls">
-      <a class="add-task-btn" href="/tasks">
-        <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-          <path d="M10 4V16M4 10H16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-        </svg>
-        Add New Task
-      </a>
-    </aside>
-  </section>
+				<div class="meta">
+					<p><strong>Priority:</strong> {selectedTask.priority}</p>
+					<p><strong>Due:</strong> {new Date(selectedTask.deadline).toLocaleString()}</p>
+					{#if selectedTask.tags && selectedTask.tags.length}
+						<p><strong>Tags:</strong> {selectedTask.tags.join(', ')}</p>
+					{/if}
+					<p><strong>Status:</strong> {selectedTask.completed ? '✅ Completed' : '🕓 Pending'}</p>
+				</div>
+
+				<div class="modal-actions">
+					{#if !selectedTask.completed}
+						<button class="complete-btn" on:click={() => markComplete(selectedTask.id)}>Mark Complete</button>
+					{/if}
+					<button class="delete-btn" on:click={() => deleteTask(selectedTask.id)}>Delete</button>
+					<button class="close-btn" on:click={() => selectedTask = null}>Close</button>
+				</div>
+			</div>
+		</div>
+	{/if}
+
+	<aside class="task-controls">
+		<a class="add-task-btn" href="/tasks">
+		  <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+			<path d="M10 4V16M4 10H16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+		  </svg>
+		  Add New Task
+		</a>
+	</aside>
 </main>
 
 <style>
-  :global(*) {
-    margin: 0;
-    padding: 0;
-    box-sizing: border-box;
-  }
-  * {
-    box-sizing: border-box;
-  }
+	:global(*) {
+		margin: 0;
+		padding: 0;
+		box-sizing: border-box;
+	}
 
-  .calendar-page {
-    background-image: url('/Bg.svg');
-    background-size: cover;
-    background-attachment: fixed;
-    min-height: 100vh;
-    display: flex;
-    flex-direction: column;
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-  }
+    * {
+        box-sizing: border-box;
+    }
 
-  .calendar-header {
-    background: #f6d7b0;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 1.25rem 2.5rem;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-  }
+    .calendar-page {
+        background-image: url('/Bg.svg');
+        background-size: cover;
+        background-attachment: fixed;
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+    }
 
-  .calendar-header h1 {
-    font-size: 1.5rem;
-    font-weight: 600;
-    color: #323e55;
-    margin: 0;
-  }
+    .calendar-header {
+        background: #f6d7b0;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 1.25rem 2.5rem;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    }
 
-  .chronos-logo {
-    max-height: 40px;
-    object-fit: contain;
-  }
-
-  .calendar-nav {
+    .calendar-header h1 {
+        font-size: 1.5rem;
+        font-weight: 600;
+        color: #323e55;
+        margin: 0;
+    }    
+	.navbar {
+		background: #f6d7b0;
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+		padding: 1.2rem 2.5rem;
+		box-shadow: 0 4px 10px rgba(0, 0, 0, 0.08);
+	}
+    .calendar-nav {
     display: flex;
     gap: 2rem;
     align-items: center;
-  }
-
-  .calendar-nav a {
-    font-size: 1rem;
-    text-decoration: none;
-    font-weight: 500;
-    color: #323e55;
-    padding: 0.5rem 0;
-    transition: all 0.2s ease;
-    border-bottom: 2px solid transparent;
-  }
-
-  .calendar-nav a:hover {
-    color: #1a2332;
-    border-bottom-color: #323e55;
-  }
-
-  .calendar-body {
-    display: grid;
-    grid-template-columns: 220px 1fr 220px;
-    gap: 1.5rem;
-    padding: 2rem 2.5rem;
-    flex: 1;
-    max-width: 1600px;
-    width: 100%;
-    margin: 0 auto;
-  }
-
-  .task-key {
-    background: white;
-    border-radius: 12px;
-    padding: 1.5rem;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-    height: fit-content;
-  }
-
-  .task-key h3 {
-    margin: 0 0 1rem 0;
-    font-size: 1rem;
-    font-weight: 600;
-    color: #323e55;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-  }
-
-  .task-key ul {
-    list-style: none;
-    padding: 0;
-    margin: 0;
-  }
-
-  .task-key li {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-    padding: 0.5rem 0;
-    font-size: 0.9rem;
-    color: #5a6a7f;
-  }
-
-  .dot {
-    width: 12px;
-    height: 12px;
-    border-radius: 50%;
-    flex-shrink: 0;
-  }
-
-  .dot.low { 
-    background: #22c55e;
-  }
-  
-  .dot.medium { 
-    background: #f59e0b;
-  }
-  
-  .dot.high { 
-    background: #ef4444;
-  }
-
-  .calendar-container {
-    background: white;
-    border-radius: 12px;
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
-    overflow: hidden;
-  }
-
-  .calendar-header-section {
-    background: linear-gradient(135deg, #323e55 0%, #4a5568 100%);
-    padding: 1.5rem 2rem;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-  }
-
-  .calendar-title {
-    font-size: 1.5rem;
-    font-weight: 600;
-    color: white;
-    margin: 0;
-    letter-spacing: 0.5px;
-  }
-
-  .month-navigation {
-    display: flex;
-    align-items: center;
-    gap: 1.5rem;
-    background: rgba(255, 255, 255, 0.1);
-    padding: 0.5rem 1rem;
-    border-radius: 8px;
-  }
-
-  .month-display {
-    font-size: 1.1rem;
-    font-weight: 500;
-    color: white;
-    min-width: 180px;
-    text-align: center;
-  }
-
-  .nav-btn {
-    background: rgba(255, 255, 255, 0.15);
-    border: none;
-    color: white;
-    width: 36px;
-    height: 36px;
-    border-radius: 8px;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: all 0.2s ease;
-  }
-
-  .nav-btn:hover {
-    background: rgba(255, 255, 255, 0.25);
-    transform: scale(1.05);
-  }
-
-  .nav-btn:active {
-    transform: scale(0.95);
-  }
-
-  .calendar-table {
-    width: 100%;
-    border-collapse: collapse;
-  }
-
-  .calendar-table thead th {
-    background: #f9fafb;
-    padding: 1rem;
-    font-weight: 600;
-    font-size: 0.85rem;
-    color: #6b7280;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    border-bottom: 2px solid #e5e7eb;
-  }
-
-  .calendar-table tbody td {
-    border: 1px solid #e5e7eb;
-    padding: 0;
-    height: 110px;
-    vertical-align: top;
-    position: relative;
-  }
-
-  .day-content {
-    padding: 0.75rem;
-    height: 100%;
-    display: flex;
-    flex-direction: column;
-  }
-
-  .day-number {
-    font-size: 0.9rem;
-    font-weight: 500;
-    color: #374151;
-    margin-bottom: 0.5rem;
-    display: inline-block;
-  }
-
-  .calendar-day.other-month .day-number {
-    color: #d1d5db;
-  }
-
-  .calendar-day.other-month {
-    background: #fafafa;
-  }
-
-  .calendar-day.today {
-    background: #eff6ff;
-  }
-
-  .calendar-day.today .day-number {
-    background: #323e55;
-    color: white;
-    width: 28px;
-    height: 28px;
-    border-radius: 50%;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    font-weight: 600;
-  }
-
-  .task-list {
-    margin: 0;
-    padding: 0;
-    list-style: none;
-    display: flex;
-    flex-direction: column;
-    gap: 0.35rem;
-    overflow-y: auto;
-    flex: 1;
-  }
-
-  .task-item {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    padding: 0.35rem 0.5rem;
-    border-radius: 4px;
-    font-size: 0.8rem;
-    transition: background 0.15s ease;
-  }
-
-  .task-item:hover {
-    background: rgba(0, 0, 0, 0.02);
-  }
-
-  .task-item.low {
-    border-left: 3px solid #22c55e;
-  }
-
-  .task-item.medium {
-    border-left: 3px solid #f59e0b;
-  }
-
-  .task-item.high {
-    border-left: 3px solid #ef4444;
-  }
-
-  .task-dot {
-    width: 6px;
-    height: 6px;
-    border-radius: 50%;
-    flex-shrink: 0;
-    background: currentColor;
-  }
-
-  .task-item.low .task-dot {
-    color: #22c55e;
-  }
-
-  .task-item.medium .task-dot {
-    color: #f59e0b;
-  }
-
-  .task-item.high .task-dot {
-    color: #ef4444;
-  }
-
-  .task-text {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    color: #374151;
-    flex: 1;
-  }
-
-  .task-controls {
-    display: flex;
-    flex-direction: column;
-    gap: 1rem;
-  }
-
-  .add-task-btn {
-    background: #323e55;
-    color: white;
-    padding: 1rem 1.5rem;
-    border-radius: 10px;
-    text-decoration: none;
-    font-weight: 600;
-    font-size: 0.95rem;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 0.5rem;
-    transition: all 0.2s ease;
-    box-shadow: 0 2px 8px rgba(50, 62, 85, 0.2);
-  }
-
-  .add-task-btn:hover {
-    background: #2a3546;
-    transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(50, 62, 85, 0.3);
-  }
-
-  .add-task-btn:active {
-    transform: translateY(0);
-  }
-
-  @media (max-width: 1200px) {
-    .calendar-body {
-      grid-template-columns: 1fr;
-      gap: 1rem;
     }
 
-    .task-key,
-    .task-controls {
-      display: none;
+    .calendar-nav a {
+        font-size: 1rem;
+        text-decoration: none;
+        font-weight: 500;
+        color: #323e55;
+        padding: 0.5rem 0;
+        transition: all 0.2s ease;
+        border-bottom: 2px solid transparent;
     }
-  }
+
+    .calendar-nav a:hover {
+        color: #1a2332;
+        border-bottom-color: #323e55;
+    }
+
+    .chronos-logo {
+        max-height: 40px;
+        object-fit: contain;
+    }
+
+	.calendar-controls {
+		display: flex;
+		justify-content: center;
+		align-items: center;
+		gap: 2rem;
+		background: #DBA15C;
+		padding: 1rem 2rem;
+		width: 100%;
+		max-width: 1000px;
+		margin: 1.5rem auto 0 auto;
+		box-shadow: 0 4px 10px rgba(0, 0, 0, 0.15);
+		border-top-left-radius: 16px;
+		border-top-right-radius: 16px;
+	}
+
+	.nav-btn {
+		background: rgba(255, 255, 255, 0.15);
+		color: white;
+		border: none;
+		padding: 0.5rem 1rem;
+		border-radius: 8px;
+		cursor: pointer;
+		font-weight: 600;
+		backdrop-filter: blur(4px);
+		transition: all 0.2s ease;
+	}
+
+	.nav-btn:hover { 
+		background: #2b3548;
+	}
+
+	.calendar-container {
+		width: 100%;
+		max-width: 1000px;
+		margin: 0 auto;
+		background: white;
+		border-bottom-left-radius: 16px;
+		border-bottom-right-radius: 16px;
+		padding: 0;
+		border: 1px solid #e5e7eb;
+		border-top: none;
+		box-shadow: 0 6px 20px rgba(0, 0, 0, 0.1);
+		overflow: hidden;
+	}
+
+	.calendar-header-row {
+		display: grid;
+		grid-template-columns: repeat(7, 1fr);
+		text-align: center;
+		font-weight: 600;
+		color: #323e55;
+		font-size: 0.9rem;
+		padding: 0.75rem 0;
+		background: #f7f4f0;
+		border-bottom: 1px solid #e5e7eb;
+		text-transform: uppercase;
+		letter-spacing: 0.03em;
+	}
+
+	.calendar-grid {
+		display: grid;
+		grid-template-columns: repeat(7, 1fr);
+		border-left: 1px solid #e5e7eb;
+		border-bottom: 1px solid #e5e7eb;
+	}
+
+	.day-cell {
+		border-top: 1px solid #e5e7eb;
+		border-right: 1px solid #e5e7eb;
+		padding: 0.75rem;
+		min-height: 100px;
+		display: flex;
+		flex-direction: column;
+		align-items: flex-start;
+		justify-content: flex-start;
+		background: #ffffff;
+		transition: background 0.2s ease;
+	}
+		
+	.day-cell:hover {
+		background: #f9fafb;
+	}
+	.day-cell.today {
+		background: #f0f7ff;
+		position: relative;
+		box-shadow: inset 0 0 0 2px #323e55;
+	}
+
+	.day-cell.other-month {
+		background: #fafafa;
+		color: #d1d5db;
+		pointer-events: none;
+	}
+
+	.task-list {
+		list-style: none;
+		padding: 0;
+		margin: 0;
+		width: 100%;
+	}
+
+	.task-item {
+		all: unset;
+		display: block;
+		font-size: 0.8rem;
+		color: #374151;
+		padding: 0.2rem 0;
+		cursor: pointer;
+		border-radius: 4px;
+	}
+
+	.task-controls {
+		display: flex;
+		justify-content: flex-end;
+		align-items: center;
+		width: 100%;
+		max-width: 1000px;
+		margin: 1.5rem auto 0 auto;
+		padding-right: relative;
+		z-index: 2;
+	}
+
+	.add-task-btn {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.5rem;
+		background-color: #323e55;
+		color: #ffffff;
+		text-decoration: none;
+		font-weight: 600;
+		padding: 0.6rem 1.25rem;
+		border-radius: 8px;
+		box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+		transition: all 0.2s ease;
+	}
+
+	.add-task-btn:hover {
+		background-color: #3f4c68; /* lighter on hover */
+		transform: translateY(-1px);
+		box-shadow: 0 4px 10px rgba(0, 0, 0, 0.15);
+	}
+
+	.add-task-btn:active {
+		transform: translateY(0);
+	}
+
+
+	.task-item.low { background: #e0f2fe; color: #0369a1; }
+	.task-item.medium { background: #fef9c3; color: #92400e; }
+	.task-item.high { background: #fee2e2; color: #991b1b; }
+	.task-item.done { opacity: 0.6; text-decoration: line-through; }
+
+	.task-item:focus {
+		outline: 2px solid #323e55;
+		outline-offset: 2px;
+	}
+
+	.modal-overlay {
+		position: fixed;
+		inset: 0;
+		background: rgba(0, 0, 0, 0.5);
+		display: flex;
+		justify-content: center;
+		align-items: center;
+		z-index: 999;
+	}
+
+	.task-modal {
+		background: white;
+		border-radius: 12px;
+		padding: 2rem;
+		width: 90%;
+		max-width: 450px;
+		box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+		animation: fadeIn 0.2s ease;
+	}
+
+	.task-modal h2 {
+		margin-bottom: 0.5rem;
+		font-size: 1.4rem;
+	}
+
+	.task-modal .desc {
+		margin-bottom: 1rem;
+		font-size: 1rem;
+		color: #444;
+	}
+
+	.task-modal .meta p {
+		margin-bottom: 0.4rem;
+	}
+
+	.modal-actions {
+		display: flex;
+		justify-content: flex-end;
+		gap: 0.6rem;
+		margin-top: 1rem;
+	}
+
+	.complete-btn {
+		background: #16a34a;
+		color: white;
+		border: none;
+		padding: 0.5rem 1rem;
+		border-radius: 6px;
+		cursor: pointer;
+		font-weight: 600;
+	}
+
+	.delete-btn {
+		background: #dc2626;
+		color: white;
+		border: none;
+		padding: 0.5rem 1rem;
+		border-radius: 6px;
+		cursor: pointer;
+		font-weight: 600;
+	}
+
+	.close-btn {
+		background: #6b7280;
+		color: white;
+		border: none;
+		padding: 0.5rem 1rem;
+		border-radius: 6px;
+		cursor: pointer;
+		font-weight: 600;
+	}
+
+	@keyframes fadeIn {
+		from { opacity: 0; transform: scale(0.95); }
+		to { opacity: 1; transform: scale(1); }
+	}
 </style>

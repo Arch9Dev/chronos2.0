@@ -18,6 +18,26 @@
   let selectedCalendar = '';
   let calendars: any[] = [];
 
+  // 🔹 Helpers for current date/time
+  function getCurrentDate() {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  }
+
+  function getCurrentTime() {
+    const now = new Date();
+    const hours = String(now.getHours()).padStart(2, '0');
+    const minutes = String(now.getMinutes()).padStart(2, '0');
+    return `${hours}:${minutes}`;
+  }
+
+  // 🔹 Dynamic min time logic
+  $: today = getCurrentDate();
+  $: minTime = date === today ? getCurrentTime() : '00:00';
+
   onMount(async () => {
     const { data: { user: currentUser }, error: authError } = await supabase.auth.getUser();
 
@@ -67,6 +87,12 @@
     const deadlineDate = combineDateTime(date, time);
     if (!deadlineDate) return (error = 'Invalid date or time');
 
+    const now = new Date();
+    if (deadlineDate < now) {
+      error = 'You cannot create a task in the past';
+      return;
+    }
+
     loading = true;
     error = null;
 
@@ -102,21 +128,6 @@
 
   function goBack() {
     goto('/calendar');
-  }
-
-  function getCurrentDate() {
-    const now = new Date();
-    const year = now.getFullYear();
-    const month = String(now.getMonth() + 1).padStart(2, '0');
-    const day = String(now.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
-  }
-
-  function getCurrentTime() {
-    const now = new Date();
-    const hours = String(now.getHours()).padStart(2, '0');
-    const minutes = String(now.getMinutes()).padStart(2, '0');
-    return `${hours}:${minutes}`;
   }
 </script>
 
