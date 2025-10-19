@@ -1,280 +1,235 @@
 <script lang="ts">
-    import { onMount } from 'svelte';
-    import { supabase } from '$lib/supabase';
-    import { goto } from '$app/navigation';
+  import { onMount } from 'svelte';
+  import { supabase } from '$lib/supabase';
+  import { goto } from '$app/navigation';
   
-    let user: any = null;
-    let loading = false;
-    let error: string | null = null;
-    let success = false;
-  
-    // Form fields
-    let title = '';
-    let description = '';
-    let deadline = '';
-    let priorityLevel = '';
-    let tags = '';
-    let selectedCalendar = '';
-    let calendars: any[] = [];
-  
-    onMount(async () => {
-      const { data: { user: currentUser }, error: authError } = await supabase.auth.getUser();
-  
-      if (authError || !currentUser) {
-        goto('/login');
-        return;
-      }
-  
-      // Fetch user profile
-      const { data: profile, error: profileError } = await supabase
-        .from('profiles')
-        .select('username')
-        .eq('id', currentUser.id)
-        .maybeSingle();
-  
-      if (profileError) {
-        error = profileError.message;
-        return;
-      }
+  let user: any = null;
+  let loading = false;
+  let error: string | null = null;
+  let success = false;
 
-      if (!profile) {
-        console.warn('No profile found for user — redirecting or creating one');
-        // optionally create a profile automatically here
-      }
-  
-      user = { ...currentUser, username: profile?.username };
-  
-      // Fetch user's calendars for dropdown
-      const { data: calendarsData, error: fetchError } = await supabase
-        .from('calendars')
-        .select('id, name')
-        .eq('user_id', user.id);
-  
-      if (fetchError) {
-        error = fetchError.message;
-        return;
-      }
-  
-      calendars = calendarsData || [];
-    });
-  
-    async function handleSubmit() {
-      if (!title.trim()) return (error = 'Title is required');
-      if (!deadline) return (error = 'Deadline is required');
-      if (!priorityLevel) return (error = 'Priority level is required');
-  
-      loading = true;
-      error = null;
-  
-      try {
-        const deadlineDate = new Date(deadline);
-  
-        const taskData = {
-          user_id: user.id,
-          title: title.trim(),
-          description: description.trim() || null,
-          deadline: deadlineDate.toISOString(),
-          priority: priorityLevel,
-          tags: tags.trim()
-            ? tags.split(',').map(tag => tag.trim()).filter(tag => tag.length > 0)
-            : [],
-          calendar_id: selectedCalendar || null,
-          completed: false,
-          created_at: new Date().toISOString()
-        };
-  
-        const { error: insertError } = await supabase.from('tasks').insert([taskData]);
-  
-        if (insertError) throw insertError;
-  
-        success = true;
-        title = description = deadline = priorityLevel = tags = selectedCalendar = '';
-  
-        // Redirect to calendar to see new task
-        setTimeout(() => goto('/calendar'), 1500);
-  
-      } catch (err: any) {
-        error = err?.message || 'Failed to create task';
-        console.error('Error creating task:', err);
-      } finally {
-        loading = false;
-      }
+  // Form fields
+  let title = '';
+  let description = '';
+  let date = '';
+  let time = '';
+  let priorityLevel = '';
+  let tags = '';
+  let selectedCalendar = '';
+  let calendars: any[] = [];
+
+  // 🔹 Helpers for current date/time
+  function getCurrentDate() {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  }
+
+  function getCurrentTime() {
+    const now = new Date();
+    const hours = String(now.getHours()).padStart(2, '0');
+    const minutes = String(now.getMinutes()).padStart(2, '0');
+    return `${hours}:${minutes}`;
+  }
+
+  // 🔹 Dynamic min time logic
+  $: today = getCurrentDate();
+  $: minTime = date === today ? getCurrentTime() : '00:00';
+
+  onMount(async () => {
+    const { data: { user: currentUser }, error: authError } = await supabase.auth.getUser();
+
+    if (authError || !currentUser) {
+      goto('/login');
+      return;
     }
-  
-    function goBack() {
-      goto('/calendar');
+
+    const { data: profile, error: profileError } = await supabase
+      .from('profiles')
+      .select('username')
+      .eq('id', currentUser.id)
+      .maybeSingle();
+
+    if (profileError) {
+      error = profileError.message;
+      return;
     }
-  
-    function getCurrentDateTime() {
-      const now = new Date();
-      const year = now.getFullYear();
-      const month = String(now.getMonth() + 1).padStart(2, '0');
-      const day = String(now.getDate()).padStart(2, '0');
-      const hours = String(now.getHours()).padStart(2, '0');
-      const minutes = String(now.getMinutes()).padStart(2, '0');
-      return `${year}-${month}-${day}T${hours}:${minutes}`;
+
+    user = { ...currentUser, username: profile?.username };
+
+    const { data: calendarsData, error: fetchError } = await supabase
+      .from('calendars')
+      .select('id, name')
+      .eq('user_id', user.id);
+
+    if (fetchError) {
+      error = fetchError.message;
+      return;
     }
-  </script>
-  
-  <main class="task-page">
-    <header class="task-header">
-      <div class="header-left">
-        <button class="back-btn" on:click={goBack} type="button">
-          <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-            <path d="M12 16L6 10L12 4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-          </svg>
-          Back to Calendar
-        </button>
-        <h1>Create New Task</h1>
-      </div>
-      <img src="/logo.svg" alt="Logo" class="chronos-logo" />
-    </header>
-  
-    <div class="task-container">
-      <form on:submit|preventDefault={handleSubmit} class="task-form">
-        <div class="form-header">
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" class="form-icon">
-            <path d="M9 11L12 14L22 4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-            <path d="M21 12V19C21 19.5304 20.7893 20.0391 20.4142 20.4142C20.0391 20.7893 19.5304 21 19 21H5C4.46957 21 3.96086 20.7893 3.58579 20.4142C3.21071 20.0391 3 19.5304 3 19V5C3 4.46957 3.21071 3.96086 3.58579 3.58579C3.96086 3.21071 4.46957 3 5 3H16" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-          </svg>
-          <h2>Task Details</h2>
-        </div>
-  
-        {#if error}
-          <div class="alert alert-error">
-            <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-              <circle cx="10" cy="10" r="8" stroke="currentColor" stroke-width="2"/>
-              <path d="M10 6V10" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-              <circle cx="10" cy="14" r="0.5" fill="currentColor"/>
-            </svg>
-            {error}
-          </div>
-        {/if}
-  
-        {#if success}
-          <div class="alert alert-success">
-            <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-              <path d="M6 10L9 13L14 7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-              <circle cx="10" cy="10" r="8" stroke="currentColor" stroke-width="2"/>
-            </svg>
-            Task created successfully! Redirecting...
-          </div>
-        {/if}
-  
-        <div class="form-grid">
-          <div class="form-group full-width">
-            <label for="title">
-              Task Title <span class="required">*</span>
-            </label>
-            <input
-              type="text"
-              id="title"
-              bind:value={title}
-              placeholder="Enter task title"
-              required
-              class="form-input"
-            />
-          </div>
-  
-          <div class="form-group full-width">
-            <label for="description">Description</label>
-            <textarea
-              id="description"
-              bind:value={description}
-              placeholder="Add task description (optional)"
-              rows="4"
-              class="form-textarea"
-            ></textarea>
-          </div>
-  
-          <div class="form-group">
-            <label for="deadline">
-              Deadline <span class="required">*</span>
-            </label>
-            <input
-              type="datetime-local"
-              id="deadline"
-              bind:value={deadline}
-              min={getCurrentDateTime()}
-              required
-              class="form-input"
-            />
-          </div>
-  
-          <div class="form-group">
-            <label for="priority">
-              Priority Level <span class="required">*</span>
-            </label>
-            <select
-              id="priority"
-              bind:value={priorityLevel}
-              required
-              class="form-select"
-            >
-              <option value="" disabled selected>Select priority</option>
-              <option value="low">Low Priority</option>
-              <option value="medium">Medium Priority</option>
-              <option value="high">High Priority</option>
-            </select>
-          </div>
-  
-          <div class="form-group">
-            <label for="calendar">Calendar (Optional)</label>
-            <select
-              id="calendar"
-              bind:value={selectedCalendar}
-              class="form-select"
-            >
-              <option value="">No calendar</option>
-              {#each calendars as calendar}
-                <option value={calendar.id}>{calendar.name}</option>
-              {/each}
-            </select>
-          </div>
-  
-          <div class="form-group">
-            <label for="tags">
-              Tags
-              <span class="label-hint">(comma-separated)</span>
-            </label>
-            <input
-              type="text"
-              id="tags"
-              bind:value={tags}
-              placeholder="work, urgent, meeting"
-              class="form-input"
-            />
-          </div>
-        </div>
-  
-        <div class="form-actions">
-          <button
-            type="button"
-            on:click={goBack}
-            class="btn btn-secondary"
-            disabled={loading}
-          >
-            Cancel
-          </button>
-          <button
-            type="submit"
-            class="btn btn-primary"
-            disabled={loading}
-          >
-            {#if loading}
-              <span class="spinner"></span>
-              Creating...
-            {:else}
-              <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-                <path d="M10 4V16M4 10H16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-              </svg>
-              Create Task
-            {/if}
-          </button>
-        </div>
-      </form>
+
+    calendars = calendarsData || [];
+  });
+
+  function combineDateTime(date: string, time: string): Date | null {
+    if (!date || !time) return null;
+    const combined = new Date(`${date}T${time}`);
+    return isNaN(combined.getTime()) ? null : combined;
+  }
+
+  async function handleSubmit() {
+    if (!title.trim()) return (error = 'Title is required');
+    if (!date) return (error = 'Date is required');
+    if (!time) return (error = 'Time is required');
+    if (!priorityLevel) return (error = 'Priority level is required');
+
+    const deadlineDate = combineDateTime(date, time);
+    if (!deadlineDate) return (error = 'Invalid date or time');
+
+    const now = new Date();
+    if (deadlineDate < now) {
+      error = 'You cannot create a task in the past';
+      return;
+    }
+
+    loading = true;
+    error = null;
+
+    try {
+      const taskData = {
+        user_id: user.id,
+        title: title.trim(),
+        description: description.trim() || null,
+        deadline: deadlineDate.toISOString(),
+        priority: priorityLevel,
+        tags: tags.trim()
+          ? tags.split(',').map(tag => tag.trim()).filter(tag => tag.length > 0)
+          : [],
+        calendar_id: selectedCalendar || null,
+        completed: false,
+        created_at: new Date().toISOString()
+      };
+
+      const { error: insertError } = await supabase.from('tasks').insert([taskData]);
+      if (insertError) throw insertError;
+
+      success = true;
+      title = description = date = time = priorityLevel = tags = selectedCalendar = '';
+
+      setTimeout(() => goto('/calendar'), 1500);
+    } catch (err: any) {
+      error = err?.message || 'Failed to create task';
+      console.error('Error creating task:', err);
+    } finally {
+      loading = false;
+    }
+  }
+
+  function goBack() {
+    goto('/calendar');
+  }
+</script>
+
+<main class="task-page">
+  <header class="task-header">
+    <div class="header-left">
+      <button class="back-btn" on:click={goBack} type="button">
+        <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+          <path d="M12 16L6 10L12 4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        Back to Calendar
+      </button>
+      <h1>Create New Task</h1>
     </div>
-  </main>
+    <img src="/logo.svg" alt="Logo" class="chronos-logo" />
+  </header>
+
+  <div class="task-container">
+    <form on:submit|preventDefault={handleSubmit} class="task-form">
+      <div class="form-header">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" class="form-icon">
+          <path d="M9 11L12 14L22 4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M21 12V19C21 19.5304 20.7893 20.0391 20.4142 20.4142C20.0391 20.7893 19.5304 21 19 21H5C4.46957 21 3.96086 20.7893 3.58579 20.4142C3.21071 20.0391 3 19.5304 3 19V5C3 4.46957 3.21071 3.96086 3.58579 3.58579C3.96086 3.21071 4.46957 3 5 3H16" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <h2>Task Details</h2>
+      </div>
+
+      {#if error}
+        <div class="alert alert-error">
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+            <circle cx="10" cy="10" r="8" stroke="currentColor" stroke-width="2"/>
+            <path d="M10 6V10" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+            <circle cx="10" cy="14" r="0.5" fill="currentColor"/>
+          </svg>
+          {error}
+        </div>
+      {/if}
+
+      {#if success}
+        <div class="alert alert-success">
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+            <path d="M6 10L9 13L14 7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            <circle cx="10" cy="10" r="8" stroke="currentColor" stroke-width="2"/>
+          </svg>
+          Task created successfully! Redirecting...
+        </div>
+      {/if}
+
+      <div class="form-grid">
+        <div class="form-group full-width">
+          <label for="title">Task Title <span class="required">*</span></label>
+          <input type="text" id="title" bind:value={title} placeholder="Enter task title" required class="form-input" />
+        </div>
+
+        <div class="form-group full-width">
+          <label for="description">Description</label>
+          <textarea id="description" bind:value={description} placeholder="Add task description (optional)" rows="4" class="form-textarea"></textarea>
+        </div>
+
+        <!-- 🔹 New separate date + time fields -->
+        <div class="form-group">
+          <label for="date">Date <span class="required">*</span></label>
+          <input type="date" id="date" bind:value={date} min={getCurrentDate()} required class="form-input" />
+        </div>
+
+        <div class="form-group">
+          <label for="time">Time <span class="required">*</span></label>
+          <input type="time" id="time" bind:value={time} min={getCurrentTime()} required class="form-input" />
+        </div>
+
+        <div class="form-group">
+          <label for="priority">Priority Level <span class="required">*</span></label>
+          <select id="priority" bind:value={priorityLevel} required class="form-select">
+            <option value="" disabled selected>Select priority</option>
+            <option value="low">Low Priority</option>
+            <option value="medium">Medium Priority</option>
+            <option value="high">High Priority</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label for="tags">Tags <span class="label-hint">(comma-separated)</span></label>
+          <input type="text" id="tags" bind:value={tags} placeholder="work, urgent, meeting" class="form-input" />
+        </div>
+      </div>
+
+      <div class="form-actions">
+        <button type="button" on:click={goBack} class="btn btn-secondary" disabled={loading}>Cancel</button>
+        <button type="submit" class="btn btn-primary" disabled={loading}>
+          {#if loading}
+            <span class="spinner"></span> Creating...
+          {:else}
+            <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+              <path d="M10 4V16M4 10H16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+            </svg>
+            Create Task
+          {/if}
+        </button>
+      </div>
+    </form>
+  </div>
+</main>
   
   <style>
     :global(*) {
