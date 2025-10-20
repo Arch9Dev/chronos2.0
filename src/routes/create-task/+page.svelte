@@ -121,11 +121,12 @@
 	<aside class="sidebar">
 		<div class="sidebar-logo"><h1>CHRONOS</h1></div>
 		<nav class="sidebar-nav">
-			<a href="/calendar">📅 Calendar</a>
-			<a href="/view">🗂️ View Tasks</a>
-			<a href="/settings">⚙️ Settings</a>
+			<a href="/calendar">Calendar</a>
+			<a href="/view">View Tasks</a>
+			<a href="/create-task" class="active">Create Task</a>
+			<a href="/settings">Settings</a>
 			<hr />
-			<a href="/tasks" class="add-task-btn">➕ Add Task</a>
+			<a href="/login">Log Out</a>
 		</nav>
 		<div class="sidebar-user"><p>{user?.email}</p></div>
 	</aside>
@@ -245,6 +246,11 @@
 		padding: 0.75rem 1rem;
 		border-radius: 8px;
 		transition: all 0.3s;
+	}
+	.sidebar-nav a.active {
+		background: #d8a15c;
+		color: #323e55;
+		font-weight: 600;
 	}
 	.sidebar-nav a:hover,
 	.sidebar-nav hr {
