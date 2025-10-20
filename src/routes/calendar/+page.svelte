@@ -111,15 +111,14 @@
 		<div class="sidebar-logo">
 			<a href="/" class="home-btn">CHRONOS</a>
 		</div>
-
 		<nav class="sidebar-nav">
 			<a href="/calendar" class="active">Calendar</a>
 			<a href="/view">View Tasks</a>
+			<a href="/create-task">Create Task</a>
 			<a href="/settings">Settings</a>
 			<hr />
-			<a href="/create-task" class="add-task-btn">Add Task</a>
+			<a href="/login">Log Out</a>
 		</nav>
-
 		<div class="sidebar-user">
 			<p>{user?.email}</p>
 		</div>
