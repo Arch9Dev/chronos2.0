@@ -18,7 +18,7 @@
   let selectedCalendar = '';
   let calendars: any[] = [];
 
-  // 🔹 Helpers for current date/time
+  // 🔹 Utility functions
   function getCurrentDate() {
     const now = new Date();
     const year = now.getFullYear();
@@ -34,11 +34,23 @@
     return `${hours}:${minutes}`;
   }
 
+  function getNext30Minutes() {
+    const now = new Date();
+    now.setMinutes(now.getMinutes() + 30);
+    const hours = String(now.getHours()).padStart(2, '0');
+    const minutes = String(now.getMinutes()).padStart(2, '0');
+    return `${hours}:${minutes}`;
+  }
+
   // 🔹 Dynamic min time logic
   $: today = getCurrentDate();
   $: minTime = date === today ? getCurrentTime() : '00:00';
 
   onMount(async () => {
+    // Set defaults for smoother UX
+    date = getCurrentDate();
+    time = getNext30Minutes();
+
     const { data: { user: currentUser }, error: authError } = await supabase.auth.getUser();
 
     if (authError || !currentUser) {
@@ -87,6 +99,7 @@
     const deadlineDate = combineDateTime(date, time);
     if (!deadlineDate) return (error = 'Invalid date or time');
 
+    // 🔹 Prevent creating tasks in the past
     const now = new Date();
     if (deadlineDate < now) {
       error = 'You cannot create a task in the past';
@@ -187,7 +200,6 @@
           <textarea id="description" bind:value={description} placeholder="Add task description (optional)" rows="4" class="form-textarea"></textarea>
         </div>
 
-        <!-- 🔹 New separate date + time fields -->
         <div class="form-group">
           <label for="date">Date <span class="required">*</span></label>
           <input type="date" id="date" bind:value={date} min={getCurrentDate()} required class="form-input" />
@@ -195,7 +207,7 @@
 
         <div class="form-group">
           <label for="time">Time <span class="required">*</span></label>
-          <input type="time" id="time" bind:value={time} min={getCurrentTime()} required class="form-input" />
+          <input type="time" id="time" bind:value={time} min={minTime} required class="form-input" />
         </div>
 
         <div class="form-group">

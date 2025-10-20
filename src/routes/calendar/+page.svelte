@@ -59,7 +59,6 @@
 	function getCalendarDays() {
 		const year = currentDate.getFullYear();
 		const month = currentDate.getMonth();
-
 		const firstDay = new Date(year, month, 1);
 		const lastDay = new Date(year, month + 1, 0);
 		const daysInMonth = lastDay.getDate();
@@ -67,13 +66,11 @@
 
 		const days: { date: Date; tasks: any[]; currentMonth: boolean }[] = [];
 
-		// Days from the previous month
 		for (let i = 0; i < startDay; i++) {
 			const date = new Date(year, month, i - startDay + 1);
 			days.push({ date, tasks: [], currentMonth: false });
 		}
 
-		// Current month days
 		for (let d = 1; d <= daysInMonth; d++) {
 			const dateObj = new Date(year, month, d);
 			const dayTasks = tasks.filter(t => {
@@ -105,74 +102,82 @@
 		);
 	}
 </script>
-
 <main class="calendar-page">
-	<header class="calendar-header">
-        <h1>Welcome, {user?.email}</h1>
-        <nav class="calendar-nav">
-          <a href="/calendar">Calendar</a>
-          <a href="/view">View Tasks</a>
-          <a href="/settings">Settings</a>
-        </nav>
-        <img src="/logo.svg" alt="Logo" class="chronos-logo" />
+	<aside class="sidebar">
+		<div class="sidebar-logo">
+			<h1>CHRONOS</h1>
+		</div>
+
+		<nav class="sidebar-nav">
+			<a href="/calendar" class="active">📅 Calendar</a>
+			<a href="/view">🗂️ View Tasks</a>
+			<a href="/settings">⚙️ Settings</a>
+			<hr />
+			<a href="/tasks" class="add-task-btn">➕ Add Task</a>
+		</nav>
+
+		<div class="sidebar-user">
+			<p>{user?.email}</p>
+		</div>
+	</aside>
+
+	<section class="calendar-content">
+    <header class="calendar-controls">
+      <button class="nav-btn" on:click={() => changeMonth(-1)}>← Prev</button>
+      <h2 class="month-label">{getMonthName(currentDate)}</h2>
+      <div class="nav-btn-group">
+        <button class="nav-btn" on:click={() => changeMonth(1)}>Next →</button>
+        <button class="nav-btn today-btn" on:click={() => currentDate = new Date()}>TODAY</button>
+      </div>
     </header>
 
-	<section class="calendar-controls">
-		<button class="nav-btn" on:click={() => changeMonth(-1)}>← Prev</button>
-		<h2 class="month-label">{getMonthName(currentDate)}</h2>
-		<button class="nav-btn" on:click={() => changeMonth(1)}>Next →</button>
+		{#if loading}
+			<div class="loading">Loading calendar...</div>
+		{:else if error}
+			<div class="error">{error}</div>
+		{:else}
+			<section class="calendar-container">
+				<div class="calendar-header-row">
+					{#each ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'] as day}
+						<div class="weekday">{day}</div>
+					{/each}
+				</div>
+
+				<div class="calendar-grid">
+					{#each getCalendarDays() as day}
+						<div class="day-cell {isToday(day.date) ? 'today' : ''} {day.currentMonth ? '' : 'other-month'}">
+							<div class="date">{day.date.getDate()}</div>
+				
+							{#if day.currentMonth && day.tasks.length > 0}
+								<ul class="task-list">
+									{#each day.tasks.slice(0, 3) as task}
+										<li>
+											<button
+												class="task-item {task.priority} {task.completed ? 'done' : ''}"
+												type="button"
+												on:click={() => selectedTask = task}>
+												{task.title}
+											</button>
+										</li>
+									{/each}
+									{#if day.tasks.length > 3}
+										<li class="task-more">+{day.tasks.length - 3} more</li>
+									{/if}
+								</ul>
+							{/if}
+						</div>
+					{/each}
+				</div>
+			</section>
+		{/if}
 	</section>
 
-	{#if loading}
-		<div class="loading">Loading calendar...</div>
-	{:else if error}
-		<div class="error">{error}</div>
-	{:else}
-		<section class="calendar-container">
-			<div class="calendar-header-row">
-				{#each ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'] as day}
-					<div class="weekday">{day}</div>
-				{/each}
-			</div>
-
-			<div class="calendar-grid">
-				{#each getCalendarDays() as day}
-					<div class="day-cell {isToday(day.date) ? 'today' : ''} {day.currentMonth ? '' : 'other-month'}">
-						<div class="date">{day.date.getDate()}</div>
-			
-						{#if day.currentMonth && day.tasks.length > 0}
-							<ul class="task-list">
-								{#each day.tasks.slice(0, 3) as task}
-									<li>
-										<button
-											class="task-item {task.priority} {task.completed ? 'done' : ''}"
-											type="button"
-											on:click={() => selectedTask = task}>
-											{task.title}
-										</button>
-									</li>
-								{/each}
-								{#if day.tasks.length > 3}
-									<li class="task-more">+{day.tasks.length - 3} more</li>
-								{/if}
-							</ul>
-						{/if}
-					</div>
-				{/each}
-			</div>
-		</section>
-	{/if}
-
-	<!-- 🪟 Modal for viewing/editing a task -->
 	{#if selectedTask}
-		<div
-			class="modal-overlay"
-			role="button"
-			tabindex="0"
-			on:click={() => selectedTask = null}
-			on:keydown={(e) => (e.key === 'Enter' || e.key === ' ') ? selectedTask = null : null}>
-			<!-- svelte-ignore a11y_click_events_have_key_events -->
+		<!-- svelte-ignore a11y_click_events_have_key_events -->
+		<!-- svelte-ignore a11y_no_static_element_interactions -->
+		<div class="modal-overlay" on:click={() => selectedTask = null}>
 			<!-- svelte-ignore a11y_no_static_element_interactions -->
+			<!-- svelte-ignore a11y_click_events_have_key_events -->
 			<div class="task-modal" on:click|stopPropagation>
 				<h2>{selectedTask.title}</h2>
 				<p class="desc">{selectedTask.description || "No description provided."}</p>
@@ -196,15 +201,6 @@
 			</div>
 		</div>
 	{/if}
-
-	<aside class="task-controls">
-		<a class="add-task-btn" href="/tasks">
-		  <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-			<path d="M10 4V16M4 10H16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-		  </svg>
-		  Add New Task
-		</a>
-	</aside>
 </main>
 
 <style>
@@ -214,112 +210,136 @@
 		box-sizing: border-box;
 	}
 
-    * {
-        box-sizing: border-box;
-    }
-
-    .calendar-page {
-        background-image: url('/Bg.svg');
-        background-size: cover;
-        background-attachment: fixed;
-        min-height: 100vh;
-        display: flex;
-        flex-direction: column;
-        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-    }
-
-    .calendar-header {
-        background: #f6d7b0;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        padding: 1.25rem 2.5rem;
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-    }
-
-    .calendar-header h1 {
-        font-size: 1.5rem;
-        font-weight: 600;
-        color: #323e55;
-        margin: 0;
-    }    
-	.navbar {
-		background: #f6d7b0;
+	.calendar-page {
 		display: flex;
-		justify-content: space-between;
-		align-items: center;
-		padding: 1.2rem 2.5rem;
-		box-shadow: 0 4px 10px rgba(0, 0, 0, 0.08);
+		min-height: 100vh;
+		background: #323E55;
+		color: #F6D7B0;
+		font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
 	}
-    .calendar-nav {
-    display: flex;
-    gap: 2rem;
-    align-items: center;
-    }
 
-    .calendar-nav a {
-        font-size: 1rem;
-        text-decoration: none;
-        font-weight: 500;
-        color: #323e55;
-        padding: 0.5rem 0;
-        transition: all 0.2s ease;
-        border-bottom: 2px solid transparent;
-    }
+	.sidebar {
+		width: 260px;
+		background: #2A3648;
+		display: flex;
+		flex-direction: column;
+		justify-content: space-between;
+		padding: 2rem 1.5rem;
+		box-shadow: 4px 0 20px rgba(0,0,0,0.25);
+	}
 
-    .calendar-nav a:hover {
-        color: #1a2332;
-        border-bottom-color: #323e55;
-    }
+	.sidebar-logo {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		text-align: center;
+		margin-bottom: 2rem;
+	}
 
-    .chronos-logo {
-        max-height: 40px;
-        object-fit: contain;
-    }
+
+	.sidebar-logo h1 {
+		font-family: Georgia, serif;
+		font-size: 1.8rem;
+		letter-spacing: 0.08em;
+		color: #D8A15C;
+	}
+
+	.sidebar-nav {
+		display: flex;
+		flex-direction: column;
+		gap: 1rem;
+	}
+
+	.sidebar-nav a {
+		text-decoration: none;
+		color: #F6D7B0;
+		font-size: 1rem;
+		padding: 0.75rem 1rem;
+		border-radius: 8px;
+		transition: all 0.3s ease;
+	}
+
+	.sidebar-nav a:hover,
+	.sidebar-nav a.active {
+		background: #D8A15C;
+		color: #323E55;
+		font-weight: 600;
+	}
+
+	.sidebar-nav hr {
+		border: 1px solid rgba(255,255,255,0.1);
+		margin: 1rem 0;
+	}
+
+	.sidebar-user {
+		text-align: center;
+		font-size: 0.9rem;
+		color: #C4C4C4;
+		margin-top: 1rem;
+	}
+
+	.calendar-content {
+		flex-grow: 1;
+		display: flex;
+		flex-direction: column;
+		padding: 2rem;
+	}
 
 	.calendar-controls {
 		display: flex;
 		justify-content: center;
 		align-items: center;
 		gap: 2rem;
-		background: #DBA15C;
+		background: #D8A15C;
+		color: #323E55;
 		padding: 1rem 2rem;
-		width: 100%;
-		max-width: 1000px;
-		margin: 1.5rem auto 0 auto;
-		box-shadow: 0 4px 10px rgba(0, 0, 0, 0.15);
-		border-top-left-radius: 16px;
-		border-top-right-radius: 16px;
+		border-radius: 16px;
+		margin-bottom: 2rem;
+		box-shadow: 0 4px 20px rgba(0,0,0,0.2);
 	}
 
 	.nav-btn {
-		background: rgba(255, 255, 255, 0.15);
-		color: white;
+		background: #323E55;
+		color: #F6D7B0;
 		border: none;
 		padding: 0.5rem 1rem;
 		border-radius: 8px;
 		cursor: pointer;
 		font-weight: 600;
-		backdrop-filter: blur(4px);
-		transition: all 0.2s ease;
+		transition: all 0.3s ease;
 	}
 
-	.nav-btn:hover { 
-		background: #2b3548;
+  .nav-btn-group {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+  }
+
+  .today-btn {
+    background: #323E55;
+    color: #f0b868;
+    font-weight: 650;
+  }
+
+  .today-btn:hover {
+    background: #f0b868;
+    color: #fff;
+  }
+
+	.nav-btn:hover {
+		background: #2A3648;
 	}
 
 	.calendar-container {
-		width: 100%;
-		max-width: 1000px;
-		margin: 0 auto;
-		background: white;
-		border-bottom-left-radius: 16px;
-		border-bottom-right-radius: 16px;
-		padding: 0;
-		border: 1px solid #e5e7eb;
-		border-top: none;
-		box-shadow: 0 6px 20px rgba(0, 0, 0, 0.1);
-		overflow: hidden;
+    background: #FFFFFF;
+    border-radius: 16px;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.25);
+    padding-bottom: 1rem;
+    color: #323E55;
+    display: flex;
+    flex-direction: column;
+    flex-grow: 1;
+    height: 100%;
 	}
 
 	.calendar-header-row {
@@ -327,187 +347,178 @@
 		grid-template-columns: repeat(7, 1fr);
 		text-align: center;
 		font-weight: 600;
-		color: #323e55;
-		font-size: 0.9rem;
+		background: #F6D7B0;
+		color: #323E55;
 		padding: 0.75rem 0;
-		background: #f7f4f0;
-		border-bottom: 1px solid #e5e7eb;
-		text-transform: uppercase;
-		letter-spacing: 0.03em;
+		border-top-left-radius: 16px;
+		border-top-right-radius: 16px;
 	}
 
 	.calendar-grid {
-		display: grid;
-		grid-template-columns: repeat(7, 1fr);
-		border-left: 1px solid #e5e7eb;
-		border-bottom: 1px solid #e5e7eb;
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    grid-template-rows: repeat(6, 1fr);
+    border-top: 1px solid #eee;
+    flex-grow: 1;
+    height: calc(100vh - 250px);
+    min-height: 600px;
+    max-height: 80vh;
+    transition: height 0.3s ease;
 	}
 
 	.day-cell {
-		border-top: 1px solid #e5e7eb;
-		border-right: 1px solid #e5e7eb;
-		padding: 0.75rem;
-		min-height: 100px;
-		display: flex;
-		flex-direction: column;
-		align-items: flex-start;
-		justify-content: flex-start;
-		background: #ffffff;
-		transition: background 0.2s ease;
+    border: 1px solid #f3f4f6;
+    padding: 0.5rem;
+    background: #fff;
+    transition: all 0.2s ease;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+    overflow: hidden;
 	}
-		
-	.day-cell:hover {
-		background: #f9fafb;
-	}
+
 	.day-cell.today {
-		background: #f0f7ff;
-		position: relative;
-		box-shadow: inset 0 0 0 2px #323e55;
+		box-shadow: inset 0 0 0 2px #D8A15C;
+		background: #fffaf1;
 	}
 
 	.day-cell.other-month {
 		background: #fafafa;
-		color: #d1d5db;
-		pointer-events: none;
+		color: #c0c0c0;
+	}
+
+	.day-cell:hover {
+		background: #f9f7f4;
+	}
+
+	.date {
+    font-weight: 600;
+    margin-bottom: 0.3rem;
+    font-size: clamp(0.8rem, 1vw, 1rem);
 	}
 
 	.task-list {
-		list-style: none;
-		padding: 0;
-		margin: 0;
-		width: 100%;
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    flex-grow: 1;
+    overflow-y: auto;
 	}
 
 	.task-item {
-		all: unset;
-		display: block;
-		font-size: 0.8rem;
-		color: #374151;
-		padding: 0.2rem 0;
-		cursor: pointer;
-		border-radius: 4px;
+    display: block;
+    padding: 0.25rem 0.4rem;
+    border-radius: 4px;
+    font-size: clamp(0.7rem, 0.9vw, 0.85rem);
+    margin-bottom: 0.25rem;
+    cursor: pointer;
+    border: none;
+    text-align: left;
 	}
-
-	.task-controls {
-		display: flex;
-		justify-content: flex-end;
-		align-items: center;
-		width: 100%;
-		max-width: 1000px;
-		margin: 1.5rem auto 0 auto;
-		padding-right: relative;
-		z-index: 2;
-	}
-
-	.add-task-btn {
-		display: inline-flex;
-		align-items: center;
-		gap: 0.5rem;
-		background-color: #323e55;
-		color: #ffffff;
-		text-decoration: none;
-		font-weight: 600;
-		padding: 0.6rem 1.25rem;
-		border-radius: 8px;
-		box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
-		transition: all 0.2s ease;
-	}
-
-	.add-task-btn:hover {
-		background-color: #3f4c68; /* lighter on hover */
-		transform: translateY(-1px);
-		box-shadow: 0 4px 10px rgba(0, 0, 0, 0.15);
-	}
-
-	.add-task-btn:active {
-		transform: translateY(0);
-	}
-
 
 	.task-item.low { background: #e0f2fe; color: #0369a1; }
 	.task-item.medium { background: #fef9c3; color: #92400e; }
 	.task-item.high { background: #fee2e2; color: #991b1b; }
 	.task-item.done { opacity: 0.6; text-decoration: line-through; }
 
-	.task-item:focus {
-		outline: 2px solid #323e55;
-		outline-offset: 2px;
+	.task-item:hover {
+		transform: translateX(2px);
+		background: #f0f0f0;
 	}
 
 	.modal-overlay {
 		position: fixed;
 		inset: 0;
-		background: rgba(0, 0, 0, 0.5);
+		background: rgba(0, 0, 0, 0.6);
 		display: flex;
 		justify-content: center;
 		align-items: center;
 		z-index: 999;
+		backdrop-filter: blur(4px);
 	}
 
 	.task-modal {
-		background: white;
-		border-radius: 12px;
+		background: #fff;
+		color: #323E55;
 		padding: 2rem;
+		border-radius: 16px;
 		width: 90%;
-		max-width: 450px;
-		box-shadow: 0 4px 12px rgba(0,0,0,0.25);
-		animation: fadeIn 0.2s ease;
+		max-width: 480px;
+		box-shadow: 0 8px 40px rgba(0,0,0,0.3);
+		animation: fadeIn 0.25s ease;
 	}
 
 	.task-modal h2 {
+		color: #D8A15C;
+		font-family: Georgia, serif;
 		margin-bottom: 0.5rem;
-		font-size: 1.4rem;
 	}
 
 	.task-modal .desc {
-		margin-bottom: 1rem;
-		font-size: 1rem;
 		color: #444;
+		margin-bottom: 1rem;
 	}
 
 	.task-modal .meta p {
 		margin-bottom: 0.4rem;
+		font-size: 0.95rem;
 	}
 
 	.modal-actions {
 		display: flex;
 		justify-content: flex-end;
 		gap: 0.6rem;
-		margin-top: 1rem;
+		margin-top: 1.2rem;
 	}
 
-	.complete-btn {
+	button.complete-btn {
 		background: #16a34a;
 		color: white;
 		border: none;
-		padding: 0.5rem 1rem;
-		border-radius: 6px;
-		cursor: pointer;
+		padding: 0.6rem 1rem;
+		border-radius: 8px;
 		font-weight: 600;
+		cursor: pointer;
+		transition: all 0.2s ease;
 	}
 
-	.delete-btn {
+	button.delete-btn {
 		background: #dc2626;
 		color: white;
 		border: none;
-		padding: 0.5rem 1rem;
-		border-radius: 6px;
-		cursor: pointer;
+		padding: 0.6rem 1rem;
+		border-radius: 8px;
 		font-weight: 600;
+		cursor: pointer;
 	}
 
-	.close-btn {
+	button.close-btn {
 		background: #6b7280;
 		color: white;
 		border: none;
-		padding: 0.5rem 1rem;
-		border-radius: 6px;
-		cursor: pointer;
+		padding: 0.6rem 1rem;
+		border-radius: 8px;
 		font-weight: 600;
+		cursor: pointer;
+	}
+
+	button:hover {
+		opacity: 0.9;
+		transform: translateY(-1px);
 	}
 
 	@keyframes fadeIn {
 		from { opacity: 0; transform: scale(0.95); }
 		to { opacity: 1; transform: scale(1); }
+	}
+
+	@media (max-width: 768px) {
+		.sidebar {
+			display: none;
+		}
+		.calendar-content {
+			padding: 1rem;
+		}
 	}
 </style>
