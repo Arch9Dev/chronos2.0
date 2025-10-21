@@ -2,20 +2,26 @@
 
 declare global {
 	namespace App {
-	  // interface Error {}
-	  // interface Locals {}
-	  // interface PageData {}
-	  // interface Platform {}
+		// interface Error {}
+		// interface Locals {}
+		// interface PageData {}
+		// interface Platform {}
 	}
-  
+
 	interface ImportMetaEnv {
-	  readonly VITE_SUPABASE_URL: string;
-	  readonly VITE_SUPABASE_ANON_KEY: string;
+		readonly VITE_SUPABASE_URL: string;
+		readonly VITE_SUPABASE_ANON_KEY: string;
 	}
-  
+
 	interface ImportMeta {
-	  readonly env: ImportMetaEnv;
+		readonly env: ImportMetaEnv;
 	}
-  }
-  
-  export {};
+}
+
+export { };
+
+import { SupabaseClient } from '@supabase/supabase-js';
+
+declare global {
+	var supabase: SupabaseClient;
+}

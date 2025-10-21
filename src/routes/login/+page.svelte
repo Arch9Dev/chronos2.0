@@ -2,9 +2,10 @@
 	import { supabase } from '$lib/supabase';
 	import { goto } from '$app/navigation';
 
-	let email = $state('');
-	let password = $state('');
-	let error = $state<string | null>(null);
+	// Svelte 5 reactive variables
+	let email = '';
+	let password = '';
+	let error: string | null = null;
 
 	async function signIn() {
 		error = null;
@@ -19,11 +20,22 @@
 			return;
 		}
 
-		const { error: e } = await supabase.auth.signInWithPassword({ email, password });
+		const { data, error: e } = await supabase.auth.signInWithPassword({
+			email,
+			password
+		});
+
 		if (e) {
-			error = 'Invalid email or password.';
+			error = e.message || 'Invalid email or password.';
 			return;
 		}
+
+		if (!data.session) {
+			error = 'Login failed. No session returned.';
+			return;
+		}
+
+		// Successful login, navigate to calendar page
 		goto('/calendar');
 	}
 
@@ -39,12 +51,7 @@
 		<h1 class="logo">CHRONOS</h1>
 
 		<label for="email">Email</label>
-		<input
-			id="email"
-			type="email"
-			placeholder="example@email.com"
-			bind:value={email}
-		/>
+		<input id="email" type="email" placeholder="example@email.com" bind:value={email} />
 
 		<label for="password">Password</label>
 		<input
@@ -52,10 +59,10 @@
 			type="password"
 			placeholder="*************"
 			bind:value={password}
-			onkeydown={handleKeydown}
+			on:keydown={handleKeydown}
 		/>
 
-		<button class="log-in-btn" onclick={signIn}>LOG IN</button>
+		<button class="log-in-btn" on:click={signIn}>LOG IN</button>
 
 		{#if error}
 			<p class="error" aria-live="polite">{error}</p>
