@@ -52,7 +52,7 @@
 		user = currentUser;
 		const { data: calendarsData, error: fetchError } = await supabase
 			.from('calendars')
-			.select('id, title')
+			.select('id, name')
 			.eq('user_id', user.id);
 			
 		if (fetchError) {
