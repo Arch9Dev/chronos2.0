@@ -50,18 +50,20 @@
 		if (authError || !currentUser) return goto('/login');
 
 		user = currentUser;
-
 		const { data: calendarsData, error: fetchError } = await supabase
 			.from('calendars')
-			.select('id,name')
+			.select('id, title')
 			.eq('user_id', user.id);
-
+			
 		if (fetchError) {
 			error = fetchError.message;
 			return;
 		}
 
 		calendars = calendarsData || [];
+		if (calendars.length > 0) {
+			selectedCalendar = calendars[0].id;
+		}
 	});
 
 	function combineDateTime(date: string, time: string): Date | null {
@@ -191,7 +193,6 @@
 					<label>Tags <span class="label-hint">(comma-separated)</span></label>
 					<input type="text" bind:value={tags} placeholder="work, urgent" class="form-input" />
 				</div>
-
 			</div>
 
 			<div class="form-actions">
