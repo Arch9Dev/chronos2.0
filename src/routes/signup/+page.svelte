@@ -1,96 +1,89 @@
 <script lang="ts">
 	import { supabase } from '$lib/supabase';
 	import { goto } from '$app/navigation';
-
-	// Svelte 5 state
-	let email = $state('');
-	let user = $state('');
-	let password = $state('');
-	let confirmPassword = $state('');
-	let error = $state<string | null>(null);
-
+  
+	// Reactive form state
+	let email = '';
+	let password = '';
+	let confirmPassword = '';
+	let error: string | null = null;
+  
 	async function signUp() {
-		error = null;
-
-		if (!email || !password || !confirmPassword) {
-			error = 'Please fill in all fields.';
-			return;
-		}
-
-		if (!email.includes('@')) {
-			error = 'Please enter a valid email address.';
-			return;
-		}
-
-		if (password !== confirmPassword) {
-			error = 'Passwords do not match.';
-			return;
-		}
-
-		const { error: e } = await supabase.auth.signUp({
-			email,
-			password,
-			options: { data: { username: user } }
-		});
-
-		if (e) {
-			error = e.message;
-			return;
-		}
-
-		goto('/login');
+	  error = null;
+  
+	  if (!email || !password || !confirmPassword) {
+		error = 'Please fill in all fields.';
+		return;
+	  }
+  
+	  if (!email.includes('@')) {
+		error = 'Please enter a valid email address.';
+		return;
+	  }
+  
+	  if (password !== confirmPassword) {
+		error = 'Passwords do not match.';
+		return;
+	  }
+  
+	  const { data, error: e } = await supabase.auth.signUp({
+		email,
+		password
+	  });
+  
+	  if (e) {
+		error = e.message;
+		return;
+	  }
+  
+	  if (!data.user) {
+		error = 'Sign-up failed. User not created.';
+		return;
+	  }
+  
+	  // Insert profile with email as username
+	  const { error: profileError } = await supabase
+		.from('profiles')
+		.insert({ id: data.user.id, username: email });
+  
+	  if (profileError) {
+		error = profileError.message;
+		return;
+	  }
+  
+	  goto('/login');
 	}
-
+  
 	function goBackToLogin() {
-		goto('/login');
+	  goto('/login');
 	}
-</script>
-
-<main class="login-page">
+  </script>
+  
+  <main class="login-page">
 	<div class="login-card">
-		<h1 class="logo">CHRONOS</h1>
-
-		<label for="email">Email</label>
-		<input
-			id="email"
-			type="email"
-			placeholder="example@email.com"
-			bind:value={email}
-		/>
-
-		<label for="user">Username</label>
-		<input id="user" type="text" placeholder="username" bind:value={user} />
-
-		<label for="password">Password</label>
-		<input
-			id="password"
-			type="password"
-			placeholder="*************"
-			bind:value={password}
-		/>
-
-		<label for="confirm-password">Confirm Password</label>
-		<input
-			id="confirm-password"
-			type="password"
-			placeholder="*************"
-			bind:value={confirmPassword}
-		/>
-
-		<button class="log-in-btn" onclick={signUp}>SIGN UP</button>
-		<button class="log-in-btn secondary" onclick={goBackToLogin}>
-			BACK TO LOGIN
-		</button>
-
-		{#if error}
-			<p class="error" aria-live="polite">{error}</p>
-		{/if}
-
-		<p class="signup-text">
-			Already have an account? <a href="/login">Log in</a>
-		</p>
+	  <h1 class="logo">CHRONOS</h1>
+  
+	  <label for="email">Email</label>
+	  <input id="email" type="email" placeholder="example@email.com" bind:value={email} />
+  
+	  <label for="password">Password</label>
+	  <input id="password" type="password" placeholder="*************" bind:value={password} />
+  
+	  <label for="confirm-password">Confirm Password</label>
+	  <input id="confirm-password" type="password" placeholder="*************" bind:value={confirmPassword} />
+  
+	  <button class="log-in-btn" on:click={signUp}>SIGN UP</button>
+	  <button class="log-in-btn secondary" on:click={goBackToLogin}>BACK TO LOGIN</button>
+  
+	  {#if error}
+		<p class="error" aria-live="polite">{error}</p>
+	  {/if}
+  
+	  <p class="signup-text">
+		Already have an account? <a href="/login">Log in</a>
+	  </p>
 	</div>
-</main>
+  </main>
 
 <style>
 	:global(*) {

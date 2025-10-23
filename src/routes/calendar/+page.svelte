@@ -162,7 +162,7 @@
 											<button
 												class="task-item {task.priority} {task.completed ? 'done' : ''}"
 												type="button"
-												on:click={() => (selectedTask = task)}
+												on:click={() => (selectedTask = { ...task })}
 											>
 												{task.title}
 											</button>
