@@ -136,7 +136,7 @@
 	<section class="calendar-content">
 		<header class="calendar-controls">
 			<h2>Create New Task</h2>
-			<button class="nav-btn today-btn" on:click={goBack}>Back to Calendar</button>
+			<button class="nav-btn back-btn" on:click={goBack}>Back to Calendar</button>
 		</header>
 
 		<div class="task-form">
@@ -229,7 +229,9 @@
 		flex-direction: column;
 		justify-content: space-between;
 		padding: 2rem 1.5rem;
+		box-shadow: 4px 0 20px rgba(0, 0, 0, 0.25);
 	}
+
 	.sidebar-logo h1 {
 		font-family: Georgia, serif;
 		font-size: 1.8rem;
@@ -246,14 +248,14 @@
 		color: #f6d7b0;
 		padding: 0.75rem 1rem;
 		border-radius: 8px;
-		transition: all 0.3s;
 	}
+	.sidebar-nav a:hover,
 	.sidebar-nav a.active {
 		background: #d8a15c;
 		color: #323e55;
 		font-weight: 600;
 	}
-	.sidebar-nav a:hover,
+
 	.sidebar-nav hr {
 		border: 1px solid rgba(255, 255, 255, 0.1);
 		margin: 1rem 0;
@@ -282,12 +284,21 @@
 		margin-bottom: 2rem;
 		box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
 	}
-	.nav-btn.today-btn {
+	.nav-btn {
+		background: #323e55;
+		color: #f6d7b0;
+		border: none;
+		padding: 0.5rem 1rem;
+		border-radius: 8px;
+		cursor: pointer;
+		font-weight: 600;
+	}
+	.nav-btn.back-btn {
 		background: #323e55;
 		color: #f0b868;
 		font-weight: 650;
 	}
-	.nav-btn.today-btn:hover {
+	.nav-btn.back-btn:hover {
 		background: #f0b868;
 		color: #fff;
 	}
@@ -373,7 +384,6 @@
 	}
 	.btn-primary:hover {
 		background: #2a3546;
-		transform: translateY(-1px);
 		box-shadow: 0 4px 12px rgba(50, 62, 85, 0.3);
 	}
 	.btn-secondary {
@@ -404,19 +414,6 @@
 		border: 1px solid #bbf7d0;
 	}
 
-	.spinner {
-		width: 16px;
-		height: 16px;
-		border: 2px solid rgba(255, 255, 255, 0.3);
-		border-top-color: white;
-		border-radius: 50%;
-		animation: spin 0.6s linear infinite;
-	}
-	@keyframes spin {
-		to {
-			transform: rotate(360deg);
-		}
-	}
 
 	@media (max-width: 768px) {
 		.calendar-page {
