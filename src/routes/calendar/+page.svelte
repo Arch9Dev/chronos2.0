@@ -10,6 +10,10 @@
 	let currentDate = new Date();
 	let selectedTask: any = null;
 
+	let showModal = false;
+	let newPriority = '';
+	let newDeadline = '';
+
 	onMount(async () => {
 		const {
 			data: { user: currentUser },
@@ -27,6 +31,7 @@
 		const { data: fetchedTasks, error: fetchError } = await supabase
 			.from('tasks')
 			.select('*')
+			.eq('user_id', user.id)
 			.order('deadline', { ascending: true });
 
 		if (fetchError) {
@@ -35,20 +40,6 @@
 			tasks = fetchedTasks || [];
 		}
 		loading = false;
-	}
-
-	async function markComplete(id: number) {
-		await supabase.from('tasks').update({ completed: true }).eq('id', id);
-		selectedTask = null;
-		await loadTasks();
-	}
-
-	async function deleteTask(id: number) {
-		if (confirm('Are you sure you want to delete this task?')) {
-			await supabase.from('tasks').delete().eq('id', id);
-			selectedTask = null;
-			await loadTasks();
-		}
 	}
 
 	function getMonthName(date: Date) {
@@ -96,6 +87,9 @@
 		return days;
 	}
 
+	// Make this reactive to both tasks and currentDate
+	$: calendarDays = tasks && currentDate ? getCalendarDays() : [];
+
 	function isToday(date: Date) {
 		const today = new Date();
 		return (
@@ -103,6 +97,52 @@
 			date.getMonth() === today.getMonth() &&
 			date.getFullYear() === today.getFullYear()
 		);
+	}
+
+	function openEdit(task: any) {
+		selectedTask = { ...task };
+		newPriority = task.priority;
+		newDeadline = task.deadline ? new Date(task.deadline).toISOString().slice(0, 16) : '';
+		showModal = true;
+	}
+
+	async function updateTask() {
+		if (!selectedTask) return;
+		const { error: updateError } = await supabase
+			.from('tasks')
+			.update({ priority: newPriority, deadline: newDeadline })
+			.eq('id', selectedTask.id);
+
+		if (updateError) {
+			alert('Error updating task: ' + updateError.message);
+			return;
+		}
+
+		tasks = tasks.map((t) =>
+			t.id === selectedTask.id ? { ...t, priority: newPriority, deadline: newDeadline } : t
+		);
+		showModal = false;
+	}
+
+	async function deleteTask() {
+		if (!selectedTask) return;
+		if (!confirm('Are you sure you want to delete this task?')) return;
+
+		const { error: delErr } = await supabase.from('tasks').delete().eq('id', selectedTask.id);
+		if (delErr) {
+			alert('Error deleting task: ' + delErr.message);
+			return;
+		}
+		
+		// Store the task ID before clearing
+		const deletedTaskId = selectedTask.id;
+		
+		// Close modal first
+		showModal = false;
+		selectedTask = null;
+		
+		// Force reactivity by creating a completely new array
+		tasks = [...tasks.filter((t) => t.id !== deletedTaskId)];
 	}
 </script>
 
@@ -147,7 +187,7 @@
 				</div>
 
 				<div class="calendar-grid">
-					{#each getCalendarDays() as day}
+					{#each calendarDays as day}
 						<div
 							class="day-cell {isToday(day.date) ? 'today' : ''} {day.currentMonth
 								? ''
@@ -162,7 +202,7 @@
 											<button
 												class="task-item {task.priority} {task.completed ? 'done' : ''}"
 												type="button"
-												on:click={() => (selectedTask = { ...task })}
+												on:click={() => openEdit(task)}
 											>
 												{task.title}
 											</button>
@@ -180,33 +220,32 @@
 		{/if}
 	</section>
 
-	{#if selectedTask}
+	{#if showModal}
 		<!-- svelte-ignore a11y_click_events_have_key_events -->
 		<!-- svelte-ignore a11y_no_static_element_interactions -->
-		<div class="modal-overlay" on:click={() => (selectedTask = null)}>
-			<!-- svelte-ignore a11y_no_static_element_interactions -->
+		<div class="modal-overlay" on:click={() => (showModal = false)}>
 			<!-- svelte-ignore a11y_click_events_have_key_events -->
-			<div class="task-modal" on:click|stopPropagation>
+			<!-- svelte-ignore a11y_no_static_element_interactions -->
+			<div class="modal" on:click|stopPropagation>
 				<h2>{selectedTask.title}</h2>
-				<p class="desc">{selectedTask.description || 'No description provided.'}</p>
-
-				<div class="meta">
-					<p><strong>Priority:</strong> {selectedTask.priority}</p>
-					<p><strong>Due:</strong> {new Date(selectedTask.deadline).toLocaleString()}</p>
-					{#if selectedTask.tags && selectedTask.tags.length}
-						<p><strong>Tags:</strong> {selectedTask.tags.join(', ')}</p>
-					{/if}
-					<p><strong>Status:</strong> {selectedTask.completed ? '✅ Completed' : '🕓 Pending'}</p>
+				<div class="form-group">
+					<!-- svelte-ignore a11y_label_has_associated_control -->
+					<label>Priority:</label>
+					<select bind:value={newPriority}>
+						<option value="low">Low</option>
+						<option value="medium">Medium</option>
+						<option value="high">High</option>
+					</select>
 				</div>
-
+				<div class="form-group">
+					<!-- svelte-ignore a11y_label_has_associated_control -->
+					<label>Deadline:</label>
+					<input type="datetime-local" bind:value={newDeadline} />
+				</div>
 				<div class="modal-actions">
-					{#if !selectedTask.completed}
-						<button class="complete-btn" on:click={() => markComplete(selectedTask.id)}
-							>Mark Complete</button
-						>
-					{/if}
-					<button class="delete-btn" on:click={() => deleteTask(selectedTask.id)}>Delete</button>
-					<button class="close-btn" on:click={() => (selectedTask = null)}>Close</button>
+					<button class="save" on:click={updateTask}>Save</button>
+					<button class="delete" on:click={deleteTask}>Delete</button>
+					<button class="cancel" on:click={() => (showModal = false)}>Cancel</button>
 				</div>
 			</div>
 		</div>
@@ -247,7 +286,7 @@
 	}
 
 	.sidebar-logo a {
-    text-decoration: none;
+		text-decoration: none;
 		font-family: Georgia, serif;
 		font-size: 1.8rem;
 		letter-spacing: 0.08em;
@@ -425,6 +464,7 @@
 		cursor: pointer;
 		border: none;
 		text-align: left;
+		width: 100%;
 	}
 
 	.task-item.low {
@@ -460,74 +500,84 @@
 		backdrop-filter: blur(4px);
 	}
 
-	.task-modal {
+	.modal {
 		background: #fff;
-		color: #323e55;
 		padding: 2rem;
 		border-radius: 16px;
+		max-width: 400px;
 		width: 90%;
-		max-width: 480px;
-		box-shadow: 0 8px 40px rgba(0, 0, 0, 0.3);
-		animation: fadeIn 0.25s ease;
+		box-shadow: 0 8px 30px rgba(0, 0, 0, 0.3);
+		color: #323e55;
 	}
 
-	.task-modal h2 {
-		color: #d8a15c;
-		font-family: Georgia, serif;
-		margin-bottom: 0.5rem;
-	}
-
-	.task-modal .desc {
-		color: #444;
+	.form-group {
 		margin-bottom: 1rem;
 	}
 
-	.task-modal .meta p {
-		margin-bottom: 0.4rem;
-		font-size: 0.95rem;
+	.form-group label {
+		display: block;
+		margin-bottom: 0.5rem;
+		font-weight: 600;
+		color: #323e55;
+	}
+
+	.form-group select,
+	.form-group input {
+		width: 100%;
+		padding: 0.5rem;
+		border: 1px solid #d1d5db;
+		border-radius: 8px;
+		font-size: 1rem;
+		font-family: inherit;
+	}
+
+	.form-group select:focus,
+	.form-group input:focus {
+		outline: none;
+		border-color: #d8a15c;
+		box-shadow: 0 0 0 3px rgba(216, 161, 92, 0.1);
 	}
 
 	.modal-actions {
 		display: flex;
-		justify-content: flex-end;
-		gap: 0.6rem;
-		margin-top: 1.2rem;
+		justify-content: space-between;
+		margin-top: 1rem;
 	}
 
-	button.complete-btn {
-		background: #16a34a;
-		color: white;
+	.modal-actions button {
 		border: none;
-		padding: 0.6rem 1rem;
 		border-radius: 8px;
-		font-weight: 600;
+		padding: 0.5rem 1rem;
 		cursor: pointer;
+		font-weight: 600;
 		transition: all 0.2s ease;
 	}
 
-	button.delete-btn {
+	button.save {
+		background: #16a34a;
+		color: white;
+	}
+
+	button.save:hover {
+		background: #15803d;
+	}
+
+	button.delete {
 		background: #dc2626;
 		color: white;
-		border: none;
-		padding: 0.6rem 1rem;
-		border-radius: 8px;
-		font-weight: 600;
-		cursor: pointer;
 	}
 
-	button.close-btn {
+	button.delete:hover {
+		background: #b91c1c;
+	}
+
+	button.cancel {
 		background: #6b7280;
 		color: white;
-		border: none;
-		padding: 0.6rem 1rem;
-		border-radius: 8px;
-		font-weight: 600;
-		cursor: pointer;
 	}
 
-	button:hover {
-		opacity: 0.9;
-		transform: translateY(-1px);
+	button.cancel:hover {
+		background: #4b5563;
 	}
 
 	@keyframes fadeIn {
