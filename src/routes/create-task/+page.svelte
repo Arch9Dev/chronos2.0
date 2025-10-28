@@ -126,7 +126,6 @@
 			<a href="/calendar">Calendar</a>
 			<a href="/view">View Tasks</a>
 			<a href="/create-task" class="active">Create Task</a>
-			<a href="/settings">Settings</a>
 			<hr />
 			<a href="/login">Log Out</a>
 		</nav>
@@ -232,12 +231,13 @@
 		box-shadow: 4px 0 20px rgba(0, 0, 0, 0.25);
 	}
 
-	.sidebar-logo h1 {
+	.sidebar-logo{
 		font-family: Georgia, serif;
 		font-size: 1.8rem;
 		color: #d8a15c;
 		text-align: center;
 	}
+	
 	.sidebar-nav {
 		display: flex;
 		flex-direction: column;
