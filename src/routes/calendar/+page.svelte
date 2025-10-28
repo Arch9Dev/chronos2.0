@@ -155,7 +155,6 @@
 			<a href="/calendar" class="active">Calendar</a>
 			<a href="/view">View Tasks</a>
 			<a href="/create-task">Create Task</a>
-			<a href="/settings">Settings</a>
 			<hr />
 			<a href="/login">Log Out</a>
 		</nav>

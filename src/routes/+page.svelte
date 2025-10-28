@@ -127,7 +127,7 @@
             <li>Unlimited task creation</li>
             <li>Multi-platform access</li>
           </ul>
-          <button class="plan-button secondary">Get Started</button>
+          <a href="/disclaimer" class="plan-button primary">Get Started</a>
         </div>
 
         <div class="price-card featured">
@@ -144,7 +144,7 @@
             <li>Multi-platform access</li>
             <li>Priority support</li>
           </ul>
-          <button class="plan-button primary">Get Started</button>
+          <a href="/disclaimer" class="plan-button primary">Get Started</a>
         </div>
 
         <div class="price-card">
@@ -158,7 +158,7 @@
             <li>Create teams</li>
             <li class="coming-soon">Coming soon</li>
           </ul>
-          <button class="plan-button secondary" disabled>Contact Us</button>
+          <a href="/disclaimer" class="plan-button primary">Get Started</a>
         </div>
       </div>
     </div>
@@ -593,22 +593,6 @@
   .plan-button.primary:hover {
     transform: translateY(-2px);
     box-shadow: 0 8px 20px #D8A15C66;
-  }
-
-  .plan-button.secondary {
-    background: transparent;
-    color: #323E55;
-    border: 2px solid #e5e7eb;
-  }
-
-  .plan-button.secondary:hover {
-    border-color: #D8A15C;
-    color: #D8A15C;
-  }
-
-  .plan-button:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
   }
 
   /* CONTACT SECTION */
