@@ -137,7 +137,6 @@
 		<div class="sidebar-logo">
 			<a href="/" class="home-btn">CHRONOS</a>
 		</div>
-
 		<nav class="sidebar-nav">
 			<a href="/calendar">Calendar</a>
 			<a href="/view" class="active">View Tasks</a>
@@ -145,7 +144,6 @@
 			<hr />
 			<a href="/login">Log Out</a>
 		</nav>
-
 		<div class="sidebar-user">
 			<p>{user?.email}</p>
 		</div>
@@ -280,12 +278,20 @@
 		box-shadow: 4px 0 20px rgba(0, 0, 0, 0.25);
 	}
 
+	.sidebar-logo {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		text-align: center;
+		margin-bottom: 2rem;
+	}
+
 	.sidebar-logo a {
 		text-decoration: none;
 		font-family: Georgia, serif;
 		font-size: 1.8rem;
-		color: #d8a15c;
 		letter-spacing: 0.08em;
+		color: #d8a15c;
 	}
 
 	.sidebar-nav {
