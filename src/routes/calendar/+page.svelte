@@ -1,6 +1,8 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { supabase } from '$lib/supabase';
+	import { notifications } from '$lib/notifications';
+	import { derived } from 'svelte/store';
 	import { goto } from '$app/navigation';
 
 	let user: any = null;
@@ -13,6 +15,9 @@
 	let showModal = false;
 	let newPriority = '';
 	let newDeadline = '';
+
+	// Derived store for unread notifications
+	const unread = derived(notifications, ($n) => $n.filter((x) => !x.read).length);
 
 	onMount(async () => {
 		const {
@@ -155,6 +160,7 @@
 			<a href="/calendar" class="active">Calendar</a>
 			<a href="/view">View Tasks</a>
 			<a href="/create-task">Create Task</a>
+			<a href="/reminders">Reminders</a>
 			<hr />
 			<a href="/login">Log Out</a>
 		</nav>
