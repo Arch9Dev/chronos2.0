@@ -1,7 +1,8 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { supabase } from '$lib/supabase';
-	import { notifications, addNotification, markAllRead } from '$lib/notifications';
+	import { goto } from '$app/navigation';
+	import { addNotification, markAllRead } from '$lib/notifications';
 
 	interface Reminder {
 		id: string;
@@ -18,12 +19,46 @@
 	let loading = true;
 	let errorMsg: string | null = null;
 
-	// Fetch reminders from Supabase
+	const ONE_HOUR = 60 * 60 * 1000;
+
 	async function fetchReminders() {
 		loading = true;
+		const now = new Date();
+		const oneHourLater = new Date(now.getTime() + ONE_HOUR);
+
+		const { data: tasks, error: taskErr } = await supabase
+			.from('tasks')
+			.select('id, title, deadline, completed')
+			.eq('user_id', user.id)
+			.eq('completed', false)
+			.lte('deadline', oneHourLater.toISOString())
+			.gte('deadline', now.toISOString());
+
+		if (taskErr) {
+			console.error(taskErr);
+			errorMsg = 'Error loading reminders';
+			loading = false;
+			return;
+		}
+
+		for (const task of tasks || []) {
+			const { error: upsertErr } = await supabase
+				.from('reminders')
+				.upsert(
+					{
+						task_id: task.id,
+						remind_at: now.toISOString(),
+						sent: false
+					},
+					{ onConflict: 'task_id' }
+				);
+			if (upsertErr && upsertErr.code !== '23505') console.error(upsertErr);
+		}
+
 		const { data, error } = await supabase
 			.from('reminders')
 			.select('id, remind_at, sent, tasks (title, deadline)')
+			.eq('tasks.user_id', user.id)
 			.order('remind_at', { ascending: true });
 
 		if (error) {
@@ -32,31 +67,55 @@
 		} else {
 			reminders = data as unknown as Reminder[];
 			errorMsg = null;
-
-			// Trigger notifications for pending reminders
 			await notifyPendingReminders();
 		}
 
 		loading = false;
 	}
 
-	// Mark reminder as sent in Supabase
 	async function markReminderSent(id: string) {
-		const { error } = await supabase
-			.from('reminders')
-			.update({ sent: true })
-			.eq('id', id);
-
+		const { error } = await supabase.from('reminders').update({ sent: true }).eq('id', id);
 		if (error) console.error('Error marking reminder as sent:', error);
 	}
 
-	// Generate notifications for reminders that are not sent
+	async function markReminderDone(id: string) {
+		await markReminderSent(id);
+		addNotification('Reminder marked as done');
+		const reminder = reminders.find((r) => r.id === id);
+		if (reminder) reminder.sent = true;
+	}
+
+	async function snoozeReminder(id: string, minutes: number) {
+		const newTime = new Date(Date.now() + minutes * 60 * 1000).toISOString();
+		const { error } = await supabase
+			.from('reminders')
+			.update({ remind_at: newTime, sent: false })
+			.eq('id', id);
+		if (!error) {
+			addNotification(`Reminder snoozed for ${minutes} minutes`);
+			await fetchReminders();
+		} else console.error(error);
+	}
+
+	async function deleteReminder(id: string) {
+		if (!confirm('Delete this reminder?')) return;
+		const { error } = await supabase.from('reminders').delete().eq('id', id);
+		if (!error) {
+			addNotification('Reminder deleted');
+			reminders = reminders.filter((r) => r.id !== id);
+		} else console.error(error);
+	}
+
 	async function notifyPendingReminders() {
 		for (const r of reminders) {
 			if (!r.sent) {
-				addNotification(`Reminder: ${r.tasks.title} at ${new Date(r.remind_at).toLocaleString()}`);
+				addNotification(
+					`Reminder: ${r.tasks.title} (Deadline: ${new Date(
+						r.tasks.deadline
+					).toLocaleString()})`
+				);
 				await markReminderSent(r.id);
-				r.sent = true; // Update local state
+				r.sent = true;
 			}
 		}
 	}
@@ -65,11 +124,20 @@
 		markAllRead();
 	}
 
-	onMount(async () => {
-		// Fetch logged-in user
-		const { data: { user: currentUser } } = await supabase.auth.getUser();
-		user = currentUser;
+	function goToCreate() {
+		goto('/create-task');
+	}
 
+	async function refreshReminders() {
+		await fetchReminders();
+		addNotification('Reminders refreshed');
+	}
+
+	onMount(async () => {
+		const {
+			data: { user: currentUser }
+		} = await supabase.auth.getUser();
+		user = currentUser;
 		await fetchReminders();
 	});
 </script>
@@ -95,38 +163,45 @@
 	<section class="reminder-content">
 		<header class="reminder-controls">
 			<h2>Reminders</h2>
-			<button on:click={clearAllNotifications} class="px-3 py-1 bg-red-600 rounded text-white text-sm">
-				Mark All Notifications Read
-			</button>
+			<div class="filters">
+				<button on:click={refreshReminders} class="btn refresh">↻ Refresh</button>
+				<button on:click={clearAllNotifications} class="btn clear">
+					Mark All Notifications Read
+				</button>
+			</div>
 		</header>
 
 		{#if loading}
-			<p class="text-gray-400 italic">Loading reminders...</p>
+			<div class="loading">Loading reminders...</div>
 		{:else if errorMsg}
-			<p class="text-red-500">{errorMsg}</p>
+			<div class="error">{errorMsg}</div>
 		{:else if reminders.length === 0}
-			<p class="text-gray-400 italic">No reminders found.</p>
+			<div class="empty">
+				<p>No tasks yet.</p>
+				<button class="btn add" on:click={goToCreate}>Create Task</button>
+			</div>
 		{:else}
-			<ul class="space-y-3">
+			<ul class="reminder-list">
 				{#each reminders as r}
-					<li class="bg-[#2b3245] hover:bg-[#343d54] rounded-xl p-4 transition-all duration-150 shadow">
-						<div class="flex items-center justify-between">
-							<div>
-								<h3 class="text-lg font-medium text-white">{r.tasks.title}</h3>
-								<p class="text-sm text-gray-400">
-									Reminder time:
-									<span class="text-gray-200 font-medium">{new Date(r.remind_at).toLocaleString()}</span>
-								</p>
-								<p class="text-sm text-gray-400">
-									Task deadline:
-									<span class="text-gray-200 font-medium">{new Date(r.tasks.deadline).toLocaleString()}</span>
-								</p>
-							</div>
-							{#if r.sent}
-								<span class="text-xs bg-green-700 text-white px-2 py-1 rounded-full">Sent</span>
-							{:else}
-								<span class="text-xs bg-yellow-600 text-white px-2 py-1 rounded-full">Pending</span>
-							{/if}
+					<li class="reminder-card {r.sent ? 'done' : ''}">
+						<div class="reminder-main">
+							<h3>{r.tasks.title}</h3>
+							<span class="tag {r.sent ? 'sent' : 'pending'}">
+								{r.sent ? 'Sent' : 'Pending'}
+							</span>
+						</div>
+
+						<p class="meta">
+							<strong>Reminder Time:</strong> {new Date(r.remind_at).toLocaleString()}
+						</p>
+						<p class="meta">
+							<strong>Deadline:</strong> {new Date(r.tasks.deadline).toLocaleString()}
+						</p>
+
+						<div class="actions">
+							<button on:click={() => snoozeReminder(r.id, 10)} class="snooze">Snooze 10m</button>
+							<button on:click={() => markReminderDone(r.id)} class="done">Done</button>
+							<button on:click={() => deleteReminder(r.id)} class="delete">Delete</button>
 						</div>
 					</li>
 				{/each}
@@ -135,33 +210,32 @@
 	</section>
 </main>
 
-
 <style>
-    :global(*) {
+	:global(*) {
 		margin: 0;
 		padding: 0;
 		box-sizing: border-box;
 	}
 
-    .reminders-page {
-        display: flex;
+	.reminders-page {
+		display: flex;
 		min-height: 100vh;
 		background: #323e55;
 		color: #f6d7b0;
 		font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    }
+	}
 
-    .sidebar {
-        width: 260px;
+	.sidebar {
+		width: 260px;
 		background: #2a3648;
 		display: flex;
 		flex-direction: column;
 		justify-content: space-between;
 		padding: 2rem 1.5rem;
 		box-shadow: 4px 0 20px rgba(0, 0, 0, 0.25);
-    }
+	}
 
-    .sidebar-logo {
+	.sidebar-logo {
 		display: flex;
 		flex-direction: column;
 		align-items: center;
@@ -211,15 +285,15 @@
 		margin-top: 1rem;
 	}
 
-    .reminder-content {
-        flex-grow: 1;
+	.reminder-content {
+		flex-grow: 1;
 		padding: 2rem;
 		display: flex;
 		flex-direction: column;
-    }
+	}
 
-    .reminder-controls {
-        display: flex;
+	.reminder-controls {
+		display: flex;
 		justify-content: space-between;
 		align-items: center;
 		background: #d8a15c;
@@ -228,5 +302,128 @@
 		border-radius: 16px;
 		margin-bottom: 2rem;
 		box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
-    }
+	}
+
+	.filters {
+		display: flex;
+		gap: 1rem;
+	}
+
+	.btn {
+		border: none;
+		border-radius: 8px;
+		padding: 0.6rem 1.2rem;
+		font-weight: 600;
+		cursor: pointer;
+		transition: all 0.2s ease;
+	}
+	.btn.refresh {
+		background: #2563eb;
+		color: white;
+	}
+	.btn.clear {
+		background: #dc2626;
+		color: white;
+	}
+	.btn.add {
+		background: #d8a15c;
+		color: #323e55;
+		font-weight: 700;
+		padding: 0.8rem 1.5rem;
+		border-radius: 8px;
+		margin-top: 1rem;
+	}
+
+	.reminder-list {
+		display: grid;
+		grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+		gap: 1.2rem;
+	}
+
+	.reminder-card {
+		background: #fff;
+		color: #323e55;
+		border-radius: 12px;
+		padding: 1.5rem;
+		box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+		transition: transform 0.2s ease;
+	}
+	.reminder-card:hover {
+		transform: translateY(-4px);
+	}
+
+	.reminder-main {
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+		margin-bottom: 0.5rem;
+	}
+
+	.tag {
+		text-transform: capitalize;
+		padding: 0.3rem 0.7rem;
+		border-radius: 6px;
+		font-size: 0.8rem;
+		font-weight: 600;
+	}
+	.tag.pending {
+		background: #fef9c3;
+		color: #92400e;
+	}
+	.tag.sent {
+		background: #dcfce7;
+		color: #166534;
+	}
+
+	.meta {
+		font-size: 0.85rem;
+		color: #555;
+		margin-top: 0.3rem;
+	}
+
+	.actions {
+		display: flex;
+		justify-content: flex-end;
+		gap: 0.5rem;
+		margin-top: 0.8rem;
+	}
+
+	.actions button {
+		border: none;
+		border-radius: 8px;
+		padding: 0.5rem 1rem;
+		cursor: pointer;
+		font-weight: 600;
+		transition: all 0.2s ease;
+	}
+
+
+	.actions button:active {
+		transform: translateY(0px);
+		box-shadow: none;
+	}
+
+	.actions button.snooze {
+		background: #eab308;
+		color: white;
+	}
+
+	.actions button.done {
+		background: #16a34a;
+		color: white;
+	}
+
+	.actions button.delete {
+		background: #dc2626;
+		color: white;
+	}
+
+
+	.loading,
+	.error,
+	.empty {
+		text-align: center;
+		margin-top: 3rem;
+		color: #f6d7b0;
+	}
 </style>
