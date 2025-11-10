@@ -18,6 +18,11 @@
 	let selectedCalendar = '';
 	let calendars: any[] = [];
 
+	// Recurrence fields
+	let recurrenceType: string = '';
+	let recurrenceInterval: number = 1;
+	let recurrenceEnd: string = '';
+
 	// Utility functions
 	function getCurrentDate() {
 		const now = new Date();
@@ -54,7 +59,7 @@
 			.from('calendars')
 			.select('id, name')
 			.eq('user_id', user.id);
-			
+
 		if (fetchError) {
 			error = fetchError.message;
 			return;
@@ -73,6 +78,7 @@
 	}
 
 	async function handleSubmit() {
+		// Basic validation
 		if (!title.trim()) return (error = 'Title is required');
 		if (!date) return (error = 'Date is required');
 		if (!time) return (error = 'Time is required');
@@ -80,8 +86,11 @@
 
 		const deadline = combineDateTime(date, time);
 		if (!deadline) return (error = 'Invalid date/time');
-
 		if (deadline < new Date()) return (error = 'You cannot create a task in the past');
+
+		// Recurrence validation
+		if (recurrenceType && recurrenceInterval < 1) return (error = 'Recurrence interval must be at least 1');
+		if (recurrenceEnd && new Date(recurrenceEnd) < deadline) return (error = 'Recurrence end date must be after the start date');
 
 		loading = true;
 		error = null;
@@ -94,18 +103,22 @@
 					description: description.trim() || null,
 					deadline: deadline.toISOString(),
 					priority: priorityLevel,
-					tags: tags
-						.split(',')
-						.map((t) => t.trim())
-						.filter(Boolean),
+					tags: tags.split(',').map((t) => t.trim()).filter(Boolean),
 					calendar_id: selectedCalendar || null,
 					completed: false,
-					created_at: new Date().toISOString()
+					created_at: new Date().toISOString(),
+					recurrence_type: recurrenceType || null,
+					recurrence_interval: recurrenceInterval || null,
+					recurrence_end: recurrenceEnd || null
 				}
 			]);
 			if (insertError) throw insertError;
+
 			success = true;
 			title = description = date = time = priorityLevel = tags = selectedCalendar = '';
+			recurrenceType = '';
+			recurrenceInterval = 1;
+			recurrenceEnd = '';
 			setTimeout(() => goto('/calendar'), 1500);
 		} catch (err: any) {
 			error = err?.message || 'Failed to create task';
@@ -151,7 +164,6 @@
 			<div class="form-grid">
 				<div class="form-group full-width">
 					<!-- svelte-ignore a11y_label_has_associated_control -->
-					<!-- svelte-ignore a11y_label_has_associated_control -->
 					<label>Title <span class="required">*</span></label>
 					<input type="text" bind:value={title} placeholder="Task title" class="form-input" />
 				</div>
@@ -160,25 +172,24 @@
 					<!-- svelte-ignore a11y_label_has_associated_control -->
 					<!-- svelte-ignore a11y_label_has_associated_control -->
 					<label>Description</label>
-					<textarea bind:value={description} placeholder="Optional" rows="4" class="form-textarea"
-					></textarea>
+					<textarea bind:value={description} placeholder="Optional" rows="4" class="form-textarea"></textarea>
 				</div>
 
-				<!-- svelte-ignore a11y_label_has_associated_control -->
-				<!-- svelte-ignore a11y_label_has_associated_control -->
+					<!-- svelte-ignore a11y_label_has_associated_control -->
+					<!-- svelte-ignore a11y_label_has_associated_control -->
 				<div class="form-group">
 					<label>Date <span class="required">*</span></label>
 					<input type="date" bind:value={date} min={getCurrentDate()} class="form-input" />
 				</div>
 
-				<!-- svelte-ignore a11y_label_has_associated_control -->
-				<!-- svelte-ignore a11y_label_has_associated_control -->
+					<!-- svelte-ignore a11y_label_has_associated_control -->
+					<!-- svelte-ignore a11y_label_has_associated_control -->
 				<div class="form-group">
 					<label>Time <span class="required">*</span></label>
 					<input type="time" bind:value={time} min={minTime} class="form-input" />
 				</div>
 
-				<!-- svelte-ignore a11y_label_has_associated_control -->
+					<!-- svelte-ignore a11y_label_has_associated_control -->
 				<!-- svelte-ignore a11y_label_has_associated_control -->
 				<div class="form-group">
 					<label>Priority <span class="required">*</span></label>
@@ -190,18 +201,43 @@
 					</select>
 				</div>
 
-				<!-- svelte-ignore a11y_label_has_associated_control -->
-				<!-- svelte-ignore a11y_label_has_associated_control -->
+					<!-- svelte-ignore a11y_label_has_associated_control -->
+					<!-- svelte-ignore a11y_label_has_associated_control -->
 				<div class="form-group">
 					<label>Tags <span class="label-hint">(comma-separated)</span></label>
 					<input type="text" bind:value={tags} placeholder="work, urgent" class="form-input" />
 				</div>
+
+					<!-- svelte-ignore a11y_label_has_associated_control -->
+				<!-- svelte-ignore a11y_label_has_associated_control -->
+				<div class="form-group">
+					<label>Recurrence</label>
+					<select bind:value={recurrenceType} class="form-select">
+						<option value="">Does not repeat</option>
+						<option value="daily">Daily</option>
+						<option value="weekly">Weekly</option>
+						<option value="monthly">Monthly</option>
+						<option value="yearly">Yearly</option>
+					</select>
+				</div>
+
+				{#if recurrenceType}
+					<!-- svelte-ignore a11y_label_has_associated_control -->
+					<!-- svelte-ignore a11y_label_has_associated_control -->
+					<div class="form-group">
+						<label>Repeat every <span class="label-hint">(interval)</span></label>
+						<input type="number" min="1" bind:value={recurrenceInterval} class="form-input" />
+					</div>
+						<!-- svelte-ignore a11y_label_has_associated_control -->
+					<div class="form-group">
+						<label>End Date <span class="label-hint">(optional)</span></label>
+						<input type="date" bind:value={recurrenceEnd} min={getCurrentDate()} class="form-input" />
+					</div>
+				{/if}
 			</div>
 
 			<div class="form-actions">
-				<button type="button" on:click={goBack} class="btn btn-secondary" disabled={loading}
-					>Cancel</button
-				>
+				<button type="button" on:click={goBack} class="btn btn-secondary" disabled={loading}>Cancel</button>
 				<button type="button" on:click={handleSubmit} class="btn btn-primary" disabled={loading}>
 					{#if loading}<span class="spinner"></span> Creating...{:else}Create Task{/if}
 				</button>

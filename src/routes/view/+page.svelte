@@ -17,6 +17,11 @@
 	let newPriority = '';
 	let newDeadline = '';
 
+	// Recurrence fields
+	let newRecurrenceType = '';
+	let newRecurrenceInterval: number | null = 1;
+	let newRecurrenceEnd: string = '';
+
 	onMount(async () => {
 		const {
 			data: { user: currentUser },
@@ -34,7 +39,7 @@
 	async function loadTasks() {
 		const { data: fetchedTasks, error: fetchError } = await supabase
 			.from('tasks')
-			.select('id, title, description, deadline, priority, completed, tags, created_at')
+			.select('id, title, description, deadline, priority, completed, tags, created_at, recurrence_type, recurrence_interval, recurrence_end')
 			.eq('user_id', user.id);
 
 		if (fetchError) {
@@ -47,6 +52,7 @@
 	}
 
 	function formatDate(dateString: string) {
+		if (!dateString) return 'N/A';
 		const date = new Date(dateString);
 		return date.toLocaleString();
 	}
@@ -95,14 +101,26 @@
 		selectedTask = { ...task };
 		newPriority = task.priority;
 		newDeadline = task.deadline ? task.deadline.slice(0, 16) : '';
+
+		newRecurrenceType = task.recurrence_type || '';
+		newRecurrenceInterval = task.recurrence_interval || 1;
+		newRecurrenceEnd = task.recurrence_end ? new Date(task.recurrence_end).toISOString().slice(0, 10) : '';
+
 		showModal = true;
 	}
 
 	async function updateTask() {
 		if (!selectedTask) return;
+
 		const { error: updateError } = await supabase
 			.from('tasks')
-			.update({ priority: newPriority, deadline: newDeadline })
+			.update({
+				priority: newPriority,
+				deadline: newDeadline,
+				recurrence_type: newRecurrenceType || null,
+				recurrence_interval: newRecurrenceType ? newRecurrenceInterval : null,
+				recurrence_end: newRecurrenceType && newRecurrenceEnd ? newRecurrenceEnd : null
+			})
 			.eq('id', selectedTask.id);
 
 		if (updateError) {
@@ -111,7 +129,16 @@
 		}
 
 		tasks = tasks.map((t) =>
-			t.id === selectedTask.id ? { ...t, priority: newPriority, deadline: newDeadline } : t
+			t.id === selectedTask.id
+				? {
+						...t,
+						priority: newPriority,
+						deadline: newDeadline,
+						recurrence_type: newRecurrenceType,
+						recurrence_interval: newRecurrenceInterval,
+						recurrence_end: newRecurrenceEnd
+				  }
+				: t
 		);
 		applyFilters();
 		showModal = false;
@@ -158,10 +185,10 @@
 					<label>
 						Filter by Priority:
 						<select bind:value={filterPriority} on:change={applyFilters}>
-						  <option value="all">All</option>
-						  <option value="low">Low</option>
-						  <option value="medium">Medium</option>
-						  <option value="high">High</option>
+							<option value="all">All</option>
+							<option value="low">Low</option>
+							<option value="medium">Medium</option>
+							<option value="high">High</option>
 						</select>
 					</label>
 				</div>
@@ -169,10 +196,10 @@
 					<label>
 						Sort By:
 						<select bind:value={sortBy} on:change={applyFilters}>
-						  <option value="due_date">Due Date</option>
-						  <option value="priority">Priority</option>
+							<option value="due_date">Due Date</option>
+							<option value="priority">Priority</option>
 						</select>
-					  </label>
+					</label>
 				</div>
 			</div>
 		</header>
@@ -202,6 +229,12 @@
 							<strong>Status:</strong>
 							{task.completed ? '✅ Completed' : '🕓 Pending'}
 						</p>
+						{#if task.recurrence_type}
+							<p class="meta">
+								<strong>Repeats:</strong> {task.recurrence_type} every {task.recurrence_interval} {task.recurrence_type === 'daily' ? 'day(s)' : task.recurrence_type === 'weekly' ? 'week(s)' : task.recurrence_type === 'monthly' ? 'month(s)' : 'year(s)'}
+								{task.recurrence_end ? ` until ${task.recurrence_end}` : ''}
+							</p>
+						{/if}
 						<div class="actions">
 							<button class="edit" on:click={() => openEdit(task)}>Edit</button>
 							<button
@@ -224,12 +257,11 @@
 		<!-- svelte-ignore a11y_no_static_element_interactions -->
 		<!-- svelte-ignore a11y_click_events_have_key_events -->
 		<div class="modal-overlay" on:click={() => (showModal = false)}>
-			<!-- svelte-ignore a11y_click_events_have_key_events -->
 			<div class="modal" on:click|stopPropagation>
 				<h2>{selectedTask.title}</h2>
+					<!-- svelte-ignore a11y_label_has_associated_control -->
+					<!-- svelte-ignore a11y_label_has_associated_control -->
 				<div class="form-group">
-					<!-- svelte-ignore a11y_label_has_associated_control -->
-					<!-- svelte-ignore a11y_label_has_associated_control -->
 					<label>Priority:</label>
 					<select bind:value={newPriority}>
 						<option value="low">Low</option>
@@ -240,9 +272,36 @@
 				<div class="form-group">
 					<!-- svelte-ignore a11y_label_has_associated_control -->
 					<!-- svelte-ignore a11y_label_has_associated_control -->
+					<!-- svelte-ignore a11y_label_has_associated_control -->
 					<label>Deadline:</label>
 					<input type="datetime-local" bind:value={newDeadline} />
 				</div>
+				<div class="form-group">
+					<!-- svelte-ignore a11y_label_has_associated_control -->
+					<!-- svelte-ignore a11y_label_has_associated_control -->
+					<label>Recurrence:</label>
+					<select bind:value={newRecurrenceType}>
+						<option value="">Does not repeat</option>
+						<option value="daily">Daily</option>
+						<option value="weekly">Weekly</option>
+						<option value="monthly">Monthly</option>
+						<option value="yearly">Yearly</option>
+					</select>
+				</div>
+
+				{#if newRecurrenceType}
+					<div class="form-group">
+						<!-- svelte-ignore a11y_label_has_associated_control -->
+						<label>Repeat every (interval):</label>
+						<input type="number" min="1" bind:value={newRecurrenceInterval} />
+					</div>
+					<div class="form-group">
+						<!-- svelte-ignore a11y_label_has_associated_control -->
+						<label>End Date (optional):</label>
+						<input type="date" bind:value={newRecurrenceEnd} min={newDeadline ? newDeadline.slice(0,10) : ''} />
+					</div>
+				{/if}
+
 				<div class="modal-actions">
 					<button class="save" on:click={updateTask}>Save</button>
 					<button class="delete" on:click={deleteTask}>Delete</button>
