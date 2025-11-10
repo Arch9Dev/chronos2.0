@@ -14,11 +14,14 @@
 	let newPriority = '';
 	let newDeadline = '';
 
+	// Recurrence fields
+	let newRecurrenceType = '';
+	let newRecurrenceInterval: number | null = 1;
+	let newRecurrenceEnd: string = '';
+
+	// Fetch current user and tasks
 	onMount(async () => {
-		const {
-			data: { user: currentUser },
-			error: authError
-		} = await supabase.auth.getUser();
+		const { data: { user: currentUser }, error: authError } = await supabase.auth.getUser();
 		if (authError || !currentUser) {
 			goto('/login');
 			return;
@@ -27,6 +30,7 @@
 		await loadTasks();
 	});
 
+	// Load all tasks
 	async function loadTasks() {
 		const { data: fetchedTasks, error: fetchError } = await supabase
 			.from('tasks')
@@ -42,6 +46,7 @@
 		loading = false;
 	}
 
+	// Utility: get month name
 	function getMonthName(date: Date) {
 		return date.toLocaleString('default', { month: 'long', year: 'numeric' });
 	}
@@ -49,46 +54,6 @@
 	function changeMonth(offset: number) {
 		currentDate = new Date(currentDate.getFullYear(), currentDate.getMonth() + offset, 1);
 	}
-
-	function getCalendarDays() {
-		const year = currentDate.getFullYear();
-		const month = currentDate.getMonth();
-		const firstDay = new Date(year, month, 1);
-		const lastDay = new Date(year, month + 1, 0);
-		const daysInMonth = lastDay.getDate();
-		const startDay = firstDay.getDay();
-
-		const days: { date: Date; tasks: any[]; currentMonth: boolean }[] = [];
-
-		for (let i = 0; i < startDay; i++) {
-			const date = new Date(year, month, i - startDay + 1);
-			days.push({ date, tasks: [], currentMonth: false });
-		}
-
-		for (let d = 1; d <= daysInMonth; d++) {
-			const dateObj = new Date(year, month, d);
-			const dayTasks = tasks.filter((t) => {
-				const taskDate = new Date(t.deadline);
-				return (
-					taskDate.getFullYear() === year &&
-					taskDate.getMonth() === month &&
-					taskDate.getDate() === d
-				);
-			});
-			days.push({ date: dateObj, tasks: dayTasks, currentMonth: true });
-		}
-
-		const totalCells = Math.ceil(days.length / 7) * 7;
-		for (let i = days.length; i < totalCells; i++) {
-			const date = new Date(year, month, i - startDay + 1);
-			days.push({ date, tasks: [], currentMonth: false });
-		}
-
-		return days;
-	}
-
-	// Make this reactive to both tasks and currentDate
-	$: calendarDays = tasks && currentDate ? getCalendarDays() : [];
 
 	function isToday(date: Date) {
 		const today = new Date();
@@ -99,18 +64,125 @@
 		);
 	}
 
+	// Generate occurrences for a recurring task between start and end
+	function generateOccurrences(task: any, start: Date, end: Date) {
+		const occurrences: Date[] = [];
+		if (!task.recurrence_type || !task.deadline) return occurrences;
+
+		const startDate = new Date(task.deadline);
+		const recurrenceEnd = task.recurrence_end ? new Date(task.recurrence_end) : end;
+		const interval = task.recurrence_interval || 1;
+
+		let current = new Date(startDate);
+
+		while (current <= end && current <= recurrenceEnd) {
+			if (current >= start) occurrences.push(new Date(current));
+
+			switch (task.recurrence_type) {
+				case 'daily':
+					current.setDate(current.getDate() + interval);
+					break;
+				case 'weekly':
+					current.setDate(current.getDate() + 7 * interval);
+					break;
+				case 'monthly':
+					current.setMonth(current.getMonth() + interval);
+					break;
+				case 'yearly':
+					current.setFullYear(current.getFullYear() + interval);
+					break;
+				default:
+					return occurrences;
+			}
+		}
+
+		return occurrences;
+	}
+
+	// Build calendar days
+	function getCalendarDays() {
+		const year = currentDate.getFullYear();
+		const month = currentDate.getMonth();
+		const firstDay = new Date(year, month, 1);
+		const lastDay = new Date(year, month + 1, 0);
+		const daysInMonth = lastDay.getDate();
+		const startDay = firstDay.getDay();
+
+		const days: { date: Date; tasks: any[]; currentMonth: boolean }[] = [];
+
+		// Previous month padding
+		for (let i = 0; i < startDay; i++) {
+			const date = new Date(year, month, i - startDay + 1);
+			days.push({ date, tasks: [], currentMonth: false });
+		}
+
+		// Current month
+		for (let d = 1; d <= daysInMonth; d++) {
+			const dateObj = new Date(year, month, d);
+
+			const dayTasks = tasks.filter((t) => {
+				if (!t.deadline) return false;
+				const taskDate = new Date(t.deadline);
+
+				// Direct match
+				if (
+					taskDate.getFullYear() === year &&
+					taskDate.getMonth() === month &&
+					taskDate.getDate() === d
+				) return true;
+
+				// Recurring match
+				const occurrences = generateOccurrences(
+					t,
+					new Date(year, month, 1),
+					new Date(year, month + 1, 0)
+				);
+				return occurrences.some(
+					occ => occ.getFullYear() === year && occ.getMonth() === month && occ.getDate() === d
+				);
+			});
+
+			days.push({ date: dateObj, tasks: dayTasks, currentMonth: true });
+		}
+
+		// Next month padding
+		const totalCells = Math.ceil(days.length / 7) * 7;
+		for (let i = days.length; i < totalCells; i++) {
+			const date = new Date(year, month, i - startDay + 1);
+			days.push({ date, tasks: [], currentMonth: false });
+		}
+
+		return days;
+	}
+
+	$: calendarDays = tasks && currentDate ? getCalendarDays() : [];
+
+	// Open modal for editing
 	function openEdit(task: any) {
 		selectedTask = { ...task };
 		newPriority = task.priority;
 		newDeadline = task.deadline ? new Date(task.deadline).toISOString().slice(0, 16) : '';
+
+		newRecurrenceType = task.recurrence_type || '';
+		newRecurrenceInterval = task.recurrence_interval || 1;
+		newRecurrenceEnd = task.recurrence_end ? new Date(task.recurrence_end).toISOString().slice(0, 10) : '';
+
 		showModal = true;
 	}
 
+	// Update task
 	async function updateTask() {
 		if (!selectedTask) return;
+
 		const { error: updateError } = await supabase
 			.from('tasks')
-			.update({ priority: newPriority, deadline: newDeadline })
+			.update({
+				priority: newPriority,
+				deadline: newDeadline,
+				recurrence_type: newRecurrenceType || null,
+				recurrence_interval: newRecurrenceType ? newRecurrenceInterval : null,
+				recurrence_end: newRecurrenceType && newRecurrenceEnd ? newRecurrenceEnd : null
+			})
 			.eq('id', selectedTask.id);
 
 		if (updateError) {
@@ -119,11 +191,21 @@
 		}
 
 		tasks = tasks.map((t) =>
-			t.id === selectedTask.id ? { ...t, priority: newPriority, deadline: newDeadline } : t
+			t.id === selectedTask.id
+				? {
+						...t,
+						priority: newPriority,
+						deadline: newDeadline,
+						recurrence_type: newRecurrenceType,
+						recurrence_interval: newRecurrenceInterval,
+						recurrence_end: newRecurrenceEnd
+				  }
+				: t
 		);
 		showModal = false;
 	}
 
+	// Delete task
 	async function deleteTask() {
 		if (!selectedTask) return;
 		if (!confirm('Are you sure you want to delete this task?')) return;
@@ -133,15 +215,10 @@
 			alert('Error deleting task: ' + delErr.message);
 			return;
 		}
-		
-		// Store the task ID before clearing
+
 		const deletedTaskId = selectedTask.id;
-		
-		// Close modal first
 		showModal = false;
 		selectedTask = null;
-		
-		// Force reactivity by creating a completely new array
 		tasks = [...tasks.filter((t) => t.id !== deletedTaskId)];
 	}
 </script>
@@ -220,13 +297,13 @@
 	</section>
 
 	{#if showModal}
-		<!-- svelte-ignore a11y_click_events_have_key_events -->
 		<!-- svelte-ignore a11y_no_static_element_interactions -->
+		<!-- svelte-ignore a11y_click_events_have_key_events -->
+		<!-- svelte-ignore a11y_click_events_have_key_events -->
 		<div class="modal-overlay" on:click={() => (showModal = false)}>
-			<!-- svelte-ignore a11y_click_events_have_key_events -->
-			<!-- svelte-ignore a11y_no_static_element_interactions -->
 			<div class="modal" on:click|stopPropagation>
 				<h2>{selectedTask.title}</h2>
+
 				<div class="form-group">
 					<!-- svelte-ignore a11y_label_has_associated_control -->
 					<label>Priority:</label>
@@ -236,11 +313,39 @@
 						<option value="high">High</option>
 					</select>
 				</div>
+
 				<div class="form-group">
 					<!-- svelte-ignore a11y_label_has_associated_control -->
 					<label>Deadline:</label>
 					<input type="datetime-local" bind:value={newDeadline} />
 				</div>
+
+					<!-- svelte-ignore a11y_label_has_associated_control -->
+				<div class="form-group">
+					<label>Recurrence:</label>
+					<select bind:value={newRecurrenceType}>
+						<option value="">Does not repeat</option>
+						<option value="daily">Daily</option>
+						<option value="weekly">Weekly</option>
+						<option value="monthly">Monthly</option>
+						<option value="yearly">Yearly</option>
+					</select>
+				</div>
+
+				{#if newRecurrenceType}
+					<!-- svelte-ignore a11y_label_has_associated_control -->
+						<!-- svelte-ignore a11y_label_has_associated_control -->
+					<div class="form-group">
+						<label>Repeat every (interval):</label>
+						<input type="number" min="1" bind:value={newRecurrenceInterval} />
+					</div>
+					<div class="form-group">
+						<!-- svelte-ignore a11y_label_has_associated_control -->
+						<label>End Date (optional):</label>
+						<input type="date" bind:value={newRecurrenceEnd} min={newDeadline ? newDeadline.slice(0,10) : ''} />
+					</div>
+				{/if}
+
 				<div class="modal-actions">
 					<button class="save" on:click={updateTask}>Save</button>
 					<button class="delete" on:click={deleteTask}>Delete</button>
@@ -250,6 +355,7 @@
 		</div>
 	{/if}
 </main>
+
 
 <style>
 	:global(*) {
