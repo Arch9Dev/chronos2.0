@@ -95,6 +95,9 @@
 			Already have an account? <a href="/login">Log in</a>
 		</p>
 	</div>
+		<div class="home">
+		<a href="/" class="home-btn">Home</a>
+	</div>
 </main>
 
 <style>
