@@ -72,6 +72,9 @@
 			Don't have an account? <a href="/signup">Sign up</a>
 		</p>
 	</div>
+	<div class="home">
+		<a href="/" class="home-btn">Home</a>
+	</div>
 </main>
 
 <style>
@@ -190,6 +193,29 @@
 
 	.signup-text a:hover {
 		text-decoration: underline;
+	}
+	.home-btn {
+		position: fixed;
+		top: 1rem;
+		left: 1rem;
+		background: #D8A15C;
+		color: #323E55;
+		font-weight: 600;
+		border: none;
+		border-radius: 8px;
+		padding: 0.5rem 1rem;
+		font-size: 1.5rem;
+		text-decoration: none;
+		cursor: pointer;
+		transition: all 0.2s ease;
+		box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+		z-index: 1000;
+	}
+
+	.home-btn:hover {
+		background: #f8e5c7;
+		transform: translateY(-1px);
+		box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
 	}
 
 	@media (max-width: 480px) {

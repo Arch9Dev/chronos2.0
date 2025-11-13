@@ -1,89 +1,97 @@
 <script lang="ts">
 	import { supabase } from '$lib/supabase';
 	import { goto } from '$app/navigation';
-  
+
 	// Reactive form state
 	let email = '';
 	let password = '';
 	let confirmPassword = '';
 	let error: string | null = null;
-  
+
 	async function signUp() {
-	  error = null;
-  
-	  if (!email || !password || !confirmPassword) {
-		error = 'Please fill in all fields.';
-		return;
-	  }
-  
-	  if (!email.includes('@')) {
-		error = 'Please enter a valid email address.';
-		return;
-	  }
-  
-	  if (password !== confirmPassword) {
-		error = 'Passwords do not match.';
-		return;
-	  }
-  
-	  const { data, error: e } = await supabase.auth.signUp({
-		email,
-		password
-	  });
-  
-	  if (e) {
-		error = e.message;
-		return;
-	  }
-  
-	  if (!data.user) {
-		error = 'Sign-up failed. User not created.';
-		return;
-	  }
-  
-	  // Insert profile with email as username
-	  const { error: profileError } = await supabase
-		.from('profiles')
-		.insert({ id: data.user.id, username: email });
-  
-	  if (profileError) {
-		error = profileError.message;
-		return;
-	  }
-  
-	  goto('/login');
+		error = null;
+
+		if (!email || !password || !confirmPassword) {
+			error = 'Please fill in all fields.';
+			return;
+		}
+
+		if (!email.includes('@')) {
+			error = 'Please enter a valid email address.';
+			return;
+		}
+
+		if (password !== confirmPassword) {
+			error = 'Passwords do not match.';
+			return;
+		}
+
+		const { data, error: e } = await supabase.auth.signUp({
+			email,
+			password
+		});
+
+		if (e) {
+			error = e.message;
+			return;
+		}
+
+		if (!data.user) {
+			error = 'Sign-up failed. User not created.';
+			return;
+		}
+
+		// Insert profile with email as username
+		const { error: profileError } = await supabase
+			.from('profiles')
+			.insert({ id: data.user.id, username: email });
+
+		if (profileError) {
+			error = profileError.message;
+			return;
+		}
+
+		goto('/login');
 	}
-  
+
 	function goBackToLogin() {
-	  goto('/login');
+		goto('/login');
 	}
-  </script>
-  
-  <main class="login-page">
+</script>
+
+<main class="login-page">
 	<div class="login-card">
-	  <h1 class="logo">CHRONOS</h1>
-  
-	  <label for="email">Email</label>
-	  <input id="email" type="email" placeholder="example@email.com" bind:value={email} />
-  
-	  <label for="password">Password</label>
-	  <input id="password" type="password" placeholder="*************" bind:value={password} />
-  
-	  <label for="confirm-password">Confirm Password</label>
-	  <input id="confirm-password" type="password" placeholder="*************" bind:value={confirmPassword} />
-  
-	  <button class="log-in-btn" on:click={signUp}>SIGN UP</button>
-	  <button class="log-in-btn secondary" on:click={goBackToLogin}>BACK TO LOGIN</button>
-  
-	  {#if error}
-		<p class="error" aria-live="polite">{error}</p>
-	  {/if}
-  
-	  <p class="signup-text">
-		Already have an account? <a href="/login">Log in</a>
-	  </p>
+		<h1 class="logo">CHRONOS</h1>
+
+		<label for="email">Email</label>
+		<input id="email" type="email" placeholder="example@email.com" bind:value={email} />
+
+		<label for="password">Password</label>
+		<input id="password" type="password" placeholder="*************" bind:value={password} />
+
+		<label for="confirm-password">Confirm Password</label>
+		<input
+			id="confirm-password"
+			type="password"
+			placeholder="*************"
+			bind:value={confirmPassword}
+		/>
+
+		<button class="log-in-btn" on:click={signUp}>SIGN UP</button>
+		<button class="log-in-btn secondary" on:click={goBackToLogin}>BACK TO LOGIN</button>
+
+		{#if error}
+			<p class="error" aria-live="polite">{error}</p>
+		{/if}
+
+		<p class="signup-text">
+			Already have an account? <a href="/login">Log in</a>
+		</p>
 	</div>
-  </main>
+	<div class="home">
+		<a href="/" class="home-btn">Home</a>
+	</div>
+</main>
 
 <style>
 	:global(*) {
@@ -183,6 +191,30 @@
 
 	.log-in-btn.secondary:hover {
 		background: #f8e5c7;
+	}
+
+	.home-btn {
+		position: fixed;
+		top: 1rem;
+		left: 1rem;
+		background: #d8a15c;
+		color: #323e55;
+		font-weight: 600;
+		border: none;
+		border-radius: 8px;
+		padding: 0.5rem 1rem;
+		font-size: 1.5rem;
+		text-decoration: none;
+		cursor: pointer;
+		transition: all 0.2s ease;
+		box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+		z-index: 1000;
+	}
+
+	.home-btn:hover {
+		background: #f8e5c7;
+		transform: translateY(-1px);
+		box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
 	}
 
 	.error {
