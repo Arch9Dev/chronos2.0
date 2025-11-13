@@ -58,8 +58,9 @@
       <button on:click={() => scrollToSection("pricing")}>Pricing</button>
       <button on:click={() => scrollToSection("contact")}>Contact</button>
     </div>
-    <div class="nav-logo">
-      <img src="/logo.svg" alt="Chronos Logo" />
+    <div class="nav-2">
+      <button class="login-btn" on:click={() => window.location.href='/login'}>Login</button>
+      <button class="signup-btn" on:click={() => window.location.href='/signup'}>Sign Up</button>
     </div>
   </div>
 </nav>
@@ -72,8 +73,8 @@
     </div>
     <div class="hero-content">
       <h1>CHRONOS</h1>
-      <p class="tagline">Turning chaos into clarity</p>
-      <a class="cta-button" href="/login">Begin Your Journey</a>
+      <p class="tagline">TURNING CHAOS INTO CLARITY</p>
+      <a class="cta-button" href="/login">BEGIN JOURNEY HERE</a>
     </div>
     <div class="feather-right">
       <img src="/featherlight.svg" alt="Decorative feather" />
@@ -232,7 +233,6 @@
     box-sizing: border-box;
   }
 
-  /* NAVIGATION */
   .navbar {
     position: fixed;
     top: 0;
@@ -246,32 +246,59 @@
   .nav-container {
     max-width: 1200px;
     margin: 0 auto;
-    padding: 1.25rem 2rem;
+    padding: clamp(0.75rem, 2vw, 1.25rem) clamp(1rem, 3vw, 2rem);
     display: flex;
     justify-content: center;
     align-items: center;
     position: relative;
   }
 
-  .nav-logo {
-    position: fixed;
-    right: 2rem;
-    top: 1.25rem;
+  .nav-2 {
+    position: absolute;
+    right: clamp(1rem, 3vw, 2rem);
+    display: flex;
+    gap: clamp(0.5rem, 1.5vw, 1rem);
   }
 
-  .nav-logo img {
-    height: 30px;
-    width: auto;
+  .login-btn,
+  .signup-btn {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    font-size: clamp(0.85rem, 1.5vw, 1rem);
+    font-weight: 500;
+    padding: clamp(0.4rem, 1vw, 0.5rem) clamp(0.75rem, 1.5vw, 1rem);
+    border-radius: clamp(6px, 1vw, 8px);
+    border: none;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+  }
+
+  .login-btn {
+    background: #323E55;
+    color: #D8A15C;
+    border: 2px solid #D8A15C;
+  }
+
+  .login-btn:hover, .signup-btn:hover {
+    background: #f8e5c7;
+  }
+
+  .signup-btn {
+    background: #323E55;
+    color: #D8A15C;
+    border: 2px solid #D8A15C;
   }
 
   .nav-links {
     display: flex;
-    gap: 2.5rem;
+    gap: clamp(1rem, 3vw, 2.5rem);
+    flex-wrap: wrap;
+    justify-content: center;
   }
 
   .nav-links button {
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-    font-size: 2rem;
+    font-size: clamp(1rem, 2.5vw, 2rem);
     font-weight: 500;
     background: none;
     border: none;
@@ -307,7 +334,7 @@
   .section-container {
     max-width: 1200px;
     margin: 0 auto;
-    padding: 0 2rem;
+    padding: 0 clamp(1rem, 3vw, 2rem);
   }
 
   /* HERO SECTION */
@@ -318,7 +345,7 @@
     min-height: 100vh;
     text-align: center;
     position: relative;
-    padding: 0 2rem;
+    padding: 0 clamp(1rem, 3vw, 2rem);
   }
 
   .feather-left,
@@ -327,21 +354,23 @@
     top: 50%;
     transform: translateY(-50%);
     z-index: 1;
+    transition: opacity 0.3s ease;
   }
 
   .feather-left {
-    left: 5%;
+    left: clamp(1%, 3vw, 5%);
   }
 
   .feather-right {
-    right: 5%;
+    right: clamp(1%, 3vw, 5%);
     transform: translateY(-50%) scaleX(-1);
   }
 
   .feather-left img,
   .feather-right img {
-    height: 60vh;
+    height: clamp(30vh, 50vw, 60vh);
     width: auto;
+    max-width: 100%;
     opacity: 0.6;
     filter: brightness(1.2);
   }
@@ -353,9 +382,9 @@
 
   .hero-content h1 {
     font-family: "Georgia", serif;
-    font-size: clamp(4rem, 12vw, 10rem);
+    font-size: clamp(3rem, 12vw, 10rem);
     font-weight: 700;
-    margin-bottom: 1.5rem;
+    margin-bottom: clamp(1rem, 2vw, 1.5rem);
     letter-spacing: 0.15em;
     color: #D8A15C;
     text-shadow: 0 4px 20px #0000004d;
@@ -363,10 +392,10 @@
 
   .tagline {
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-    font-size: clamp(1.1rem, 2vw, 1.5rem);
+    font-size: clamp(0.9rem, 2vw, 1.5rem);
     font-weight: 400;
     display: block;
-    margin-bottom: 3rem;
+    margin-bottom: clamp(2rem, 4vw, 3rem);
     letter-spacing: 0.05em;
     color: #F6D7B0;
     opacity: 0.95;
@@ -374,11 +403,11 @@
 
   .cta-button {
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-    font-size: 1.1rem;
+    font-size: clamp(0.95rem, 2vw, 1.1rem);
     font-weight: 600;
     background: linear-gradient(135deg, #D8A15C 0%, #D8A15C 100%);
     color: #323E55;
-    padding: 1.1rem 3rem;
+    padding: clamp(0.9rem, 2vw, 1.1rem) clamp(2rem, 4vw, 3rem);
     border-radius: 50px;
     border: none;
     cursor: pointer;
@@ -395,24 +424,24 @@
 
   /* CONTENT SECTIONS */
   .content-section {
-    padding: 6rem 0;
+    padding: clamp(3rem, 8vw, 6rem) 0;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   }
 
   .content-section h2 {
     font-family: "Georgia", serif;
-    font-size: clamp(2rem, 4vw, 3rem);
+    font-size: clamp(1.75rem, 4vw, 3rem);
     font-weight: 600;
-    margin-bottom: 1rem;
+    margin-bottom: clamp(0.75rem, 2vw, 1rem);
     color: #D8A15C;
     text-align: center;
   }
 
   .section-subtitle {
     text-align: center;
-    font-size: 1.2rem;
+    font-size: clamp(1rem, 2vw, 1.2rem);
     color: #8EAEBB;
-    margin-bottom: 4rem;
+    margin-bottom: clamp(2.5rem, 5vw, 4rem);
     font-weight: 400;
   }
 
@@ -423,15 +452,15 @@
 
   .features-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-    gap: 2.5rem;
-    margin-top: 3rem;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr));
+    gap: clamp(1.5rem, 3vw, 2.5rem);
+    margin-top: clamp(2rem, 4vw, 3rem);
   }
 
   .feature-card {
     background: #2a3648;
-    border-radius: 16px;
-    padding: 2.5rem 2rem;
+    border-radius: clamp(12px, 2vw, 16px);
+    padding: clamp(2rem, 3vw, 2.5rem) clamp(1.5rem, 2.5vw, 2rem);
     text-align: center;
     transition: all 0.3s ease;
     border: 1px solid #D8A15C1a;
@@ -444,19 +473,19 @@
   }
 
   .feature-icon {
-    font-size: 3rem;
-    margin-bottom: 1.5rem;
+    font-size: clamp(2.5rem, 4vw, 3rem);
+    margin-bottom: clamp(1rem, 2vw, 1.5rem);
   }
 
   .feature-card h3 {
-    font-size: 1.4rem;
+    font-size: clamp(1.2rem, 2vw, 1.4rem);
     font-weight: 600;
     color: #D8A15C;
-    margin-bottom: 1rem;
+    margin-bottom: clamp(0.75rem, 1.5vw, 1rem);
   }
 
   .feature-card p {
-    font-size: 1rem;
+    font-size: clamp(0.9rem, 1.5vw, 1rem);
     line-height: 1.7;
     color: #F6D7B0;
   }
@@ -468,16 +497,16 @@
 
   .pricing-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-    gap: 2rem;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr));
+    gap: clamp(1.5rem, 2.5vw, 2rem);
     max-width: 1000px;
     margin: 0 auto;
   }
 
   .price-card {
     background: white;
-    padding: 2.5rem 2rem;
-    border-radius: 16px;
+    padding: clamp(2rem, 3vw, 2.5rem) clamp(1.5rem, 2.5vw, 2rem);
+    border-radius: clamp(12px, 2vw, 16px);
     box-shadow: 0 10px 40px #00000026;
     transition: all 0.3s ease;
     position: relative;
@@ -487,7 +516,6 @@
 
   .price-card.featured {
     border: 2px solid #D8A15C;
-    transform: scale(1.05);
   }
 
   .price-card:hover {
@@ -495,72 +523,68 @@
     box-shadow: 0 20px 60px #00000033;
   }
 
-  .price-card.featured:hover {
-    transform: scale(1.05) translateY(-8px);
-  }
-
   .featured-badge {
     position: absolute;
     top: -12px;
-    right: 20px;
+    right: clamp(12px, 3vw, 20px);
     background: linear-gradient(135deg, #D8A15C 0%, #D8A15C 100%);
     color: white;
-    padding: 0.4rem 1.2rem;
+    padding: clamp(0.3rem, 0.8vw, 0.4rem) clamp(0.9rem, 2vw, 1.2rem);
     border-radius: 20px;
-    font-size: 0.85rem;
+    font-size: clamp(0.75rem, 1.2vw, 0.85rem);
     font-weight: 600;
   }
 
   .plan-name {
     font-family: "Georgia", serif;
-    font-size: 1.5rem;
+    font-size: clamp(1.3rem, 2.5vw, 1.5rem);
     font-weight: 600;
     color: #323E55;
-    margin-bottom: 1.5rem;
+    margin-bottom: clamp(1rem, 2vw, 1.5rem);
   }
 
   .price {
-    margin-bottom: 2rem;
+    margin-bottom: clamp(1.5rem, 2.5vw, 2rem);
     display: flex;
     align-items: baseline;
     justify-content: center;
   }
 
   .currency {
-    font-size: 1.5rem;
+    font-size: clamp(1.2rem, 2vw, 1.5rem);
     color: #323E55;
     font-weight: 600;
   }
 
   .amount {
-    font-size: 4rem;
+    font-size: clamp(3rem, 5vw, 4rem);
     font-weight: 700;
     color: #323E55;
     line-height: 1;
   }
 
   .period {
-    font-size: 1rem;
+    font-size: clamp(0.85rem, 1.5vw, 1rem);
     color: #8EAEBB;
     margin-left: 0.3rem;
   }
 
   .amount-text {
-    font-size: 2.5rem;
+    font-size: clamp(2rem, 3.5vw, 2.5rem);
     font-weight: 700;
     color: #323E55;
   }
 
   .features-list {
     list-style: none;
-    margin-bottom: 2rem;
+    margin-bottom: clamp(1.5rem, 2.5vw, 2rem);
     flex-grow: 1;
   }
 
   .features-list li {
-    padding: 0.75rem 0;
+    padding: clamp(0.6rem, 1.2vw, 0.75rem) 0;
     color: #323E55;
-    font-size: 1rem;
+    font-size: clamp(0.9rem, 1.5vw, 1rem);
     border-bottom: 1px solid #f3f4f6;
   }
 
@@ -571,18 +595,21 @@
   .features-list li.coming-soon {
     color: #8EAEBB;
     font-style: italic;
-    font-size: 0.9rem;
+    font-size: clamp(0.8rem, 1.3vw, 0.9rem);
   }
 
   .plan-button {
     width: 100%;
-    padding: 1rem;
-    border-radius: 8px;
+    padding: clamp(0.85rem, 1.5vw, 1rem);
+    border-radius: clamp(6px, 1vw, 8px);
     border: none;
-    font-size: 1rem;
+    font-size: clamp(0.9rem, 1.5vw, 1rem);
     font-weight: 600;
     cursor: pointer;
     transition: all 0.3s ease;
+    text-decoration: none;
+    display: block;
+    text-align: center;
   }
 
   .plan-button.primary {
@@ -606,26 +633,26 @@
   }
 
   .form-group {
-    margin-bottom: 1.5rem;
+    margin-bottom: clamp(1.2rem, 2vw, 1.5rem);
   }
 
   .form-group label {
     display: block;
-    margin-bottom: 0.5rem;
+    margin-bottom: clamp(0.4rem, 0.8vw, 0.5rem);
     color: #D8A15C;
     font-weight: 500;
-    font-size: 0.95rem;
+    font-size: clamp(0.85rem, 1.4vw, 0.95rem);
   }
 
   .contact-form input,
   .contact-form textarea {
     width: 100%;
-    padding: 1rem 1.25rem;
-    border-radius: 10px;
+    padding: clamp(0.85rem, 1.5vw, 1rem) clamp(1rem, 2vw, 1.25rem);
+    border-radius: clamp(8px, 1.5vw, 10px);
     border: 2px solid #D8A15C33;
     background: #f9f7f4;
     color: #323E55;
-    font-size: 1rem;
+    font-size: clamp(0.9rem, 1.5vw, 1rem);
     font-family: inherit;
     transition: all 0.3s ease;
   }
@@ -649,22 +676,22 @@
   }
 
   .contact-form textarea {
-    min-height: 150px;
+    min-height: clamp(120px, 20vw, 150px);
     resize: vertical;
   }
 
   .submit-button {
     width: 100%;
-    padding: 1.1rem;
+    padding: clamp(0.95rem, 1.8vw, 1.1rem);
     background: linear-gradient(135deg, #D8A15C 0%, #D8A15C 100%);
     color: white;
-    font-size: 1.1rem;
+    font-size: clamp(0.95rem, 1.8vw, 1.1rem);
     font-weight: 600;
     border: none;
-    border-radius: 10px;
+    border-radius: clamp(8px, 1.5vw, 10px);
     cursor: pointer;
     transition: all 0.3s ease;
-    margin-top: 0.5rem;
+    margin-top: clamp(0.3rem, 0.8vw, 0.5rem);
   }
 
   .submit-button:hover:not(:disabled) {
@@ -678,11 +705,12 @@
   }
 
   .status-message {
-    margin-top: 1.5rem;
-    padding: 1rem;
-    border-radius: 8px;
+    margin-top: clamp(1.2rem, 2vw, 1.5rem);
+    padding: clamp(0.85rem, 1.5vw, 1rem);
+    border-radius: clamp(6px, 1vw, 8px);
     text-align: center;
     font-weight: 500;
+    font-size: clamp(0.85rem, 1.4vw, 0.95rem);
   }
 
   .status-message.success {
@@ -700,68 +728,45 @@
   /* FOOTER */
   .footer {
     background: #323E55;
-    padding: 2rem;
+    padding: clamp(1.5rem, 3vw, 2rem);
     text-align: center;
     color: #8EAEBB;
-    font-size: 0.9rem;
+    font-size: clamp(0.8rem, 1.3vw, 0.9rem);
   }
 
   /* RESPONSIVE DESIGN */
   @media (max-width: 1200px) {
-    .feather-left,
-    .feather-right {
-      opacity: 0.3;
+    .feather-left img,
+    .feather-right img {
+      opacity: 0.4;
     }
   }
-
-  @media (max-width: 768px) {
+  
+  @media (max-width: 900px) {
+    .feather-left img,
+    .feather-right img {
+      opacity: 0.2;
+    }
+  }
+  
+  @media (max-width: 700px) {
     .feather-left,
     .feather-right {
       display: none;
     }
-
+    
+    .nav-2 {
+      position: static;
+      margin-top: clamp(0.5rem, 1vw, 0.75rem);
+    }
+    
     .nav-container {
       flex-direction: column;
-      gap: 1rem;
-      padding: 1rem;
+      gap: clamp(0.5rem, 1.5vw, 0.75rem);
     }
-
-    .nav-links {
-      gap: 1.5rem;
-    }
-
-    .features-grid,
-    .pricing-grid {
-      grid-template-columns: 1fr;
-      max-width: 500px;
-      margin-left: auto;
-      margin-right: auto;
-    }
-
+    
     .price-card.featured {
       transform: scale(1);
-    }
-
-    .price-card.featured:hover {
-      transform: translateY(-8px);
-    }
-
-    .content-section {
-      padding: 4rem 0;
-    }
-  }
-
-  @media (max-width: 480px) {
-    .nav-links {
-      gap: 1rem;
-    }
-
-    .nav-links button {
-      font-size: 0.85rem;
-    }
-
-    .section-subtitle {
-      font-size: 1rem;
     }
   }
 </style>

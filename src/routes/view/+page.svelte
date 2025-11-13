@@ -22,6 +22,10 @@
 	let newRecurrenceInterval: number | null = 1;
 	let newRecurrenceEnd: string = '';
 
+	let deletedTasks: { task: any; timeoutId: any }[] = [];
+	let undoTimeout: any = null;
+	let showUndo = false;
+
 	onMount(async () => {
 		const {
 			data: { user: currentUser },
@@ -39,7 +43,9 @@
 	async function loadTasks() {
 		const { data: fetchedTasks, error: fetchError } = await supabase
 			.from('tasks')
-			.select('id, title, description, deadline, priority, completed, tags, created_at, recurrence_type, recurrence_interval, recurrence_end')
+			.select(
+				'id, title, description, deadline, priority, completed, tags, created_at, recurrence_type, recurrence_interval, recurrence_end'
+			)
 			.eq('user_id', user.id);
 
 		if (fetchError) {
@@ -104,7 +110,9 @@
 
 		newRecurrenceType = task.recurrence_type || '';
 		newRecurrenceInterval = task.recurrence_interval || 1;
-		newRecurrenceEnd = task.recurrence_end ? new Date(task.recurrence_end).toISOString().slice(0, 10) : '';
+		newRecurrenceEnd = task.recurrence_end
+			? new Date(task.recurrence_end).toISOString().slice(0, 10)
+			: '';
 
 		showModal = true;
 	}
@@ -137,7 +145,7 @@
 						recurrence_type: newRecurrenceType,
 						recurrence_interval: newRecurrenceInterval,
 						recurrence_end: newRecurrenceEnd
-				  }
+					}
 				: t
 		);
 		applyFilters();
@@ -148,14 +156,72 @@
 		if (!selectedTask) return;
 		if (!confirm('Are you sure you want to delete this task?')) return;
 
-		const { error: delErr } = await supabase.from('tasks').delete().eq('id', selectedTask.id);
-		if (delErr) {
-			alert('Error deleting task: ' + delErr.message);
-			return;
-		}
+		// Remove from UI immediately
 		tasks = tasks.filter((t) => t.id !== selectedTask.id);
 		applyFilters();
+
+		// Store deleted task for undo
+		const taskToDelete = selectedTask;
+
+		// Close the modal
 		showModal = false;
+		selectedTask = null;
+
+		showUndo = true;
+		const timeoutId = setTimeout(() => {
+			// Permanently delete from Supabase after 5 seconds
+			supabase.from('tasks').delete().eq('id', taskToDelete.id);
+			deletedTasks = deletedTasks.filter((t) => t.task.id !== taskToDelete.id);
+			if (deletedTasks.length === 0) showUndo = false;
+		}, 5000);
+
+		deletedTasks.push({ task: taskToDelete, timeoutId });
+	}
+
+	async function deleteAllTasks() {
+		if (!confirm('Are you sure you want to delete ALL tasks?')) return;
+
+		// Keep a backup for undo
+		deletedTasks = tasks.map((task) => ({ task, timeoutId: null }));
+
+		// Remove all tasks from UI immediately
+		tasks = [];
+		applyFilters();
+
+		showUndo = true;
+
+		// Schedule permanent deletion from Supabase after 5 seconds
+		for (const item of deletedTasks) {
+			item.timeoutId = setTimeout(async () => {
+				await supabase.from('tasks').delete().eq('id', item.task.id);
+				deletedTasks = deletedTasks.filter((t) => t.task.id !== item.task.id);
+				if (deletedTasks.length === 0) showUndo = false;
+			}, 5000);
+		}
+	}
+
+	async function undoDelete(taskId?: string) {
+		if (deletedTasks.length === 0) return;
+
+		if (taskId) {
+			// Undo a specific task
+			const index = deletedTasks.findIndex((t) => t.task.id === taskId);
+			if (index === -1) return;
+
+			const { task, timeoutId } = deletedTasks[index];
+			clearTimeout(timeoutId);
+			tasks = [...tasks, task];
+			deletedTasks.splice(index, 1);
+		} else {
+			// Undo all pending deletions
+			for (const { task, timeoutId } of deletedTasks) {
+				clearTimeout(timeoutId);
+				tasks = [...tasks, task];
+			}
+			deletedTasks = [];
+		}
+		applyFilters();
+		showUndo = deletedTasks.length > 0;
 	}
 </script>
 
@@ -202,6 +268,18 @@
 					</label>
 				</div>
 			</div>
+			<div class="bulk-actions">
+				<button class="delete-all" on:click={deleteAllTasks}>Delete All Tasks</button>
+				{#if showUndo}
+					<div class="undo-bar">
+						<p>Task deleted</p>
+						{#each deletedTasks as { task }}
+							<button on:click={() => undoDelete(task.id)}>Undo {task.title}</button>
+						{/each}
+						<button on:click={() => undoDelete()}>Undo All</button>
+					</div>
+				{/if}
+			</div>
 		</header>
 
 		{#if loading}
@@ -231,7 +309,15 @@
 						</p>
 						{#if task.recurrence_type}
 							<p class="meta">
-								<strong>Repeats:</strong> {task.recurrence_type} every {task.recurrence_interval} {task.recurrence_type === 'daily' ? 'day(s)' : task.recurrence_type === 'weekly' ? 'week(s)' : task.recurrence_type === 'monthly' ? 'month(s)' : 'year(s)'}
+								<strong>Repeats:</strong>
+								{task.recurrence_type} every {task.recurrence_interval}
+								{task.recurrence_type === 'daily'
+									? 'day(s)'
+									: task.recurrence_type === 'weekly'
+										? 'week(s)'
+										: task.recurrence_type === 'monthly'
+											? 'month(s)'
+											: 'year(s)'}
 								{task.recurrence_end ? ` until ${task.recurrence_end}` : ''}
 							</p>
 						{/if}
@@ -259,8 +345,8 @@
 		<div class="modal-overlay" on:click={() => (showModal = false)}>
 			<div class="modal" on:click|stopPropagation>
 				<h2>{selectedTask.title}</h2>
-					<!-- svelte-ignore a11y_label_has_associated_control -->
-					<!-- svelte-ignore a11y_label_has_associated_control -->
+				<!-- svelte-ignore a11y_label_has_associated_control -->
+				<!-- svelte-ignore a11y_label_has_associated_control -->
 				<div class="form-group">
 					<label>Priority:</label>
 					<select bind:value={newPriority}>
@@ -298,7 +384,11 @@
 					<div class="form-group">
 						<!-- svelte-ignore a11y_label_has_associated_control -->
 						<label>End Date (optional):</label>
-						<input type="date" bind:value={newRecurrenceEnd} min={newDeadline ? newDeadline.slice(0,10) : ''} />
+						<input
+							type="date"
+							bind:value={newRecurrenceEnd}
+							min={newDeadline ? newDeadline.slice(0, 10) : ''}
+						/>
 					</div>
 				{/if}
 
@@ -404,6 +494,36 @@
 		border-radius: 16px;
 		margin-bottom: 2rem;
 		box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+	}
+
+	.bulk-actions {
+		margin-bottom: 1rem;
+		display: flex;
+		gap: 1rem;
+	}
+
+	button.delete-all {
+		background: #dc2626;
+		color: white;
+	}
+	.undo-bar {
+		display: flex;
+		gap: 0.5rem;
+		margin-bottom: 1rem;
+		flex-wrap: wrap;
+		align-items: center;
+		background: #fef3c7;
+		color: #92400e;
+		padding: 0.8rem 1rem;
+		border-radius: 8px;
+	}
+
+	.undo-bar button {
+		background: #16a34a;
+		color: white;
+		padding: 0.3rem 0.6rem;
+		border-radius: 6px;
+		font-size: 0.85rem;
 	}
 
 	.filters {
