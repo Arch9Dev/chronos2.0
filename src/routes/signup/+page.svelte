@@ -57,7 +57,7 @@
 
 		// Success - redirect based on confirmation setting
 		if (data.user && !data.user.confirmed_at) {
-			error = 'Success! Please check your email to confirm your account.';
+			error = 'Account Created Successfully';
 			// Don't redirect yet
 		} else {
 			goto('/login');
