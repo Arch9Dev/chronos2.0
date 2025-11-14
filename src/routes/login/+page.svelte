@@ -6,6 +6,7 @@
 	let email = '';
 	let password = '';
 	let error: string | null = null;
+	let showPassword = false;
 
 	async function signIn() {
 		error = null;
@@ -54,13 +55,53 @@
 		<input id="email" type="email" placeholder="example@email.com" bind:value={email} />
 
 		<label for="password">Password</label>
-		<input
-			id="password"
-			type="password"
-			placeholder="*************"
-			bind:value={password}
-			on:keydown={handleKeydown}
-		/>
+		<div class="password-wrapper">
+			<input
+				id="password"
+				type={showPassword ? 'text' : 'password'}
+				placeholder="*************"
+				bind:value={password}
+				on:keydown={handleKeydown}
+			/>
+			<button
+				type="button"
+				class="toggle-password"
+				on:click={() => (showPassword = !showPassword)}
+				aria-label={showPassword ? 'Hide password' : 'Show password'}
+			>
+				{#if showPassword}
+					<svg
+						xmlns="http://www.w3.org/2000/svg"
+						width="20"
+						height="20"
+						viewBox="0 0 24 24"
+						fill="none"
+						stroke="currentColor"
+						stroke-width="2"
+						stroke-linecap="round"
+						stroke-linejoin="round"
+					>
+						<path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" />
+						<line x1="1" y1="1" x2="23" y2="23" />
+					</svg>
+				{:else}
+					<svg
+						xmlns="http://www.w3.org/2000/svg"
+						width="20"
+						height="20"
+						viewBox="0 0 24 24"
+						fill="none"
+						stroke="currentColor"
+						stroke-width="2"
+						stroke-linecap="round"
+						stroke-linejoin="round"
+					>
+						<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+						<circle cx="12" cy="12" r="3" />
+					</svg>
+				{/if}
+			</button>
+		</div>
 
 		<button class="log-in-btn" on:click={signIn}>LOG IN</button>
 
@@ -137,6 +178,37 @@
 		transition: all 0.3s ease;
 	}
 
+	.password-wrapper {
+		width: 100%;
+		position: relative;
+		margin-bottom: 1.2rem;
+	}
+
+	.password-wrapper input {
+		margin-bottom: 0;
+		padding-right: 3rem;
+	}
+
+	.toggle-password {
+		position: absolute;
+		right: 0.75rem;
+		top: 50%;
+		transform: translateY(-50%);
+		background: none;
+		border: none;
+		color: #7a6c58;
+		cursor: pointer;
+		padding: 0.25rem;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		transition: color 0.2s ease;
+	}
+
+	.toggle-password:hover {
+		color: #323e55;
+	}
+
 	input::placeholder {
 		color: #7a6c58;
 	}
@@ -194,6 +266,7 @@
 	.signup-text a:hover {
 		text-decoration: underline;
 	}
+
 	.home-btn {
 		position: fixed;
 		top: 1rem;
