@@ -7,6 +7,8 @@
 	let password = '';
 	let confirmPassword = '';
 	let error: string | null = null;
+	let showPassword = false;
+	let showConfirmPassword = false;
 
 	async function signUp() {
 		error = null;
@@ -74,15 +76,100 @@
 		<input id="email" type="email" placeholder="example@email.com" bind:value={email} />
 
 		<label for="password">Password</label>
-		<input id="password" type="password" placeholder="*************" bind:value={password} />
+		<div class="password-wrapper">
+			<input
+				id="password"
+				type={showPassword ? 'text' : 'password'}
+				placeholder="*************"
+				bind:value={password}
+			/>
+			<button
+				type="button"
+				class="toggle-password"
+				on:click={() => (showPassword = !showPassword)}
+				aria-label={showPassword ? 'Hide password' : 'Show password'}
+			>
+				{#if showPassword}
+					<svg
+						xmlns="http://www.w3.org/2000/svg"
+						width="20"
+						height="20"
+						viewBox="0 0 24 24"
+						fill="none"
+						stroke="currentColor"
+						stroke-width="2"
+						stroke-linecap="round"
+						stroke-linejoin="round"
+					>
+						<path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" />
+						<line x1="1" y1="1" x2="23" y2="23" />
+					</svg>
+				{:else}
+					<svg
+						xmlns="http://www.w3.org/2000/svg"
+						width="20"
+						height="20"
+						viewBox="0 0 24 24"
+						fill="none"
+						stroke="currentColor"
+						stroke-width="2"
+						stroke-linecap="round"
+						stroke-linejoin="round"
+					>
+						<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+						<circle cx="12" cy="12" r="3" />
+					</svg>
+				{/if}
+			</button>
+		</div>
 
 		<label for="confirm-password">Confirm Password</label>
-		<input
-			id="confirm-password"
-			type="password"
-			placeholder="*************"
-			bind:value={confirmPassword}
-		/>
+		<div class="password-wrapper">
+			<input
+				id="confirm-password"
+				type={showConfirmPassword ? 'text' : 'password'}
+				placeholder="*************"
+				bind:value={confirmPassword}
+			/>
+			<button
+				type="button"
+				class="toggle-password"
+				on:click={() => (showConfirmPassword = !showConfirmPassword)}
+				aria-label={showConfirmPassword ? 'Hide password' : 'Show password'}
+			>
+				{#if showConfirmPassword}
+					<svg
+						xmlns="http://www.w3.org/2000/svg"
+						width="20"
+						height="20"
+						viewBox="0 0 24 24"
+						fill="none"
+						stroke="currentColor"
+						stroke-width="2"
+						stroke-linecap="round"
+						stroke-linejoin="round"
+					>
+						<path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" />
+						<line x1="1" y1="1" x2="23" y2="23" />
+					</svg>
+				{:else}
+					<svg
+						xmlns="http://www.w3.org/2000/svg"
+						width="20"
+						height="20"
+						viewBox="0 0 24 24"
+						fill="none"
+						stroke="currentColor"
+						stroke-width="2"
+						stroke-linecap="round"
+						stroke-linejoin="round"
+					>
+						<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+						<circle cx="12" cy="12" r="3" />
+					</svg>
+				{/if}
+			</button>
+		</div>
 
 		<button class="log-in-btn" on:click={signUp}>SIGN UP</button>
 		<button class="log-in-btn secondary" on:click={goBackToLogin}>BACK TO LOGIN</button>
@@ -95,7 +182,7 @@
 			Already have an account? <a href="/login">Log in</a>
 		</p>
 	</div>
-		<div class="home">
+	<div class="home">
 		<a href="/" class="home-btn">Home</a>
 	</div>
 </main>
@@ -158,6 +245,37 @@
 		background: #f6d7b0;
 		color: #323e55;
 		transition: all 0.3s ease;
+	}
+
+	.password-wrapper {
+		width: 100%;
+		position: relative;
+		margin-bottom: 1.2rem;
+	}
+
+	.password-wrapper input {
+		margin-bottom: 0;
+		padding-right: 3rem;
+	}
+
+	.toggle-password {
+		position: absolute;
+		right: 0.75rem;
+		top: 50%;
+		transform: translateY(-50%);
+		background: none;
+		border: none;
+		color: #7a6c58;
+		cursor: pointer;
+		padding: 0.25rem;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		transition: color 0.2s ease;
+	}
+
+	.toggle-password:hover {
+		color: #323e55;
 	}
 
 	input::placeholder {
