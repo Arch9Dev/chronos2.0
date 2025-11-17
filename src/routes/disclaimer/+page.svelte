@@ -4,9 +4,6 @@
 <div class="landing-container">
   <nav class="navbar">
     <div class="nav-container">
-      <div class="nav-logo">
-        <img src="/logo.svg" alt="Chronos Logo" />
-      </div>
     </div>
   </nav>
 
@@ -86,10 +83,6 @@
     align-items: center;
   }
 
-  .nav-logo img {
-    height: 30px;
-    width: auto;
-  }
 
   /* LAYOUT */
   .landing-container {
