@@ -12,7 +12,9 @@
 	let title = '';
 	let description = '';
 	let date = '';
-	let time = '';
+	let hour = '12';
+	let minute = '00';
+	let period = 'PM';
 	let priorityLevel = '';
 	let tags = '';
 	let selectedCalendar = '';
@@ -20,8 +22,18 @@
 
 	// Recurrence fields
 	let recurrenceType: string = '';
-	let recurrenceInterval: number = 1;
+	let selectedDays: string[] = [];
 	let recurrenceEnd: string = '';
+
+	const daysOfWeek = [
+		{ value: 'monday', label: 'Monday', short: 'Mon' },
+		{ value: 'tuesday', label: 'Tuesday', short: 'Tue' },
+		{ value: 'wednesday', label: 'Wednesday', short: 'Wed' },
+		{ value: 'thursday', label: 'Thursday', short: 'Thu' },
+		{ value: 'friday', label: 'Friday', short: 'Fri' },
+		{ value: 'saturday', label: 'Saturday', short: 'Sat' },
+		{ value: 'sunday', label: 'Sunday', short: 'Sun' }
+	];
 
 	// Utility functions
 	function getCurrentDate() {
@@ -29,24 +41,31 @@
 		return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
 	}
 
-	function getCurrentTime() {
-		const now = new Date();
-		return `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
-	}
-
 	function getNext30Minutes() {
 		const now = new Date();
 		now.setMinutes(now.getMinutes() + 30);
-		return `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+		const hours = now.getHours();
+		const mins = now.getMinutes();
+		
+		const hour12 = hours % 12 || 12;
+		const period = hours >= 12 ? 'PM' : 'AM';
+		
+		return {
+			hour: String(hour12).padStart(2, '0'),
+			minute: String(mins).padStart(2, '0'),
+			period
+		};
 	}
 
 	$: today = getCurrentDate();
-	$: minTime = date === today ? getCurrentTime() : '00:00';
 
 	onMount(async () => {
 		// Set defaults
 		date = getCurrentDate();
-		time = getNext30Minutes();
+		const defaultTime = getNext30Minutes();
+		hour = defaultTime.hour;
+		minute = defaultTime.minute;
+		period = defaultTime.period;
 
 		const {
 			data: { user: currentUser },
@@ -71,9 +90,22 @@
 		}
 	});
 
-	function combineDateTime(date: string, time: string): Date | null {
-		if (!date || !time) return null;
-		const dt = new Date(`${date}T${time}`);
+	function toggleDay(day: string) {
+		if (selectedDays.includes(day)) {
+			selectedDays = selectedDays.filter(d => d !== day);
+		} else {
+			selectedDays = [...selectedDays, day];
+		}
+	}
+
+	function combineDateTime(date: string, hour: string, minute: string, period: string): Date | null {
+		if (!date || !hour || !minute || !period) return null;
+		
+		let hour24 = parseInt(hour);
+		if (period === 'PM' && hour24 !== 12) hour24 += 12;
+		if (period === 'AM' && hour24 === 12) hour24 = 0;
+		
+		const dt = new Date(`${date}T${String(hour24).padStart(2, '0')}:${minute}`);
 		return isNaN(dt.getTime()) ? null : dt;
 	}
 
@@ -81,43 +113,54 @@
 		// Basic validation
 		if (!title.trim()) return (error = 'Title is required');
 		if (!date) return (error = 'Date is required');
-		if (!time) return (error = 'Time is required');
+		if (!hour || !minute) return (error = 'Time is required');
 		if (!priorityLevel) return (error = 'Priority level is required');
 
-		const deadline = combineDateTime(date, time);
+		const deadline = combineDateTime(date, hour, minute, period);
 		if (!deadline) return (error = 'Invalid date/time');
 		if (deadline < new Date()) return (error = 'You cannot create a task in the past');
 
 		// Recurrence validation
-		if (recurrenceType && recurrenceInterval < 1) return (error = 'Recurrence interval must be at least 1');
-		if (recurrenceEnd && new Date(recurrenceEnd) < deadline) return (error = 'Recurrence end date must be after the start date');
+		if (recurrenceType === 'weekly' && selectedDays.length === 0) {
+			return (error = 'Please select at least one day for weekly recurrence');
+		}
+		if (recurrenceEnd && new Date(recurrenceEnd) < deadline) {
+			return (error = 'Recurrence end date must be after the start date');
+		}
 
 		loading = true;
 		error = null;
 
 		try {
-			const { error: insertError } = await supabase.from('tasks').insert([
-				{
-					user_id: user.id,
-					title: title.trim(),
-					description: description.trim() || null,
-					deadline: deadline.toISOString(),
-					priority: priorityLevel,
-					tags: tags.split(',').map((t) => t.trim()).filter(Boolean),
-					calendar_id: selectedCalendar || null,
-					completed: false,
-					created_at: new Date().toISOString(),
-					recurrence_type: recurrenceType || null,
-					recurrence_interval: recurrenceInterval || null,
-					recurrence_end: recurrenceEnd || null
-				}
-			]);
+			const taskData: any = {
+				user_id: user.id,
+				title: title.trim(),
+				description: description.trim() || null,
+				deadline: deadline.toISOString(),
+				priority: priorityLevel,
+				tags: tags.split(',').map((t) => t.trim()).filter(Boolean),
+				calendar_id: selectedCalendar || null,
+				completed: false,
+				created_at: new Date().toISOString(),
+				recurrence_type: recurrenceType || null,
+				recurrence_end: recurrenceEnd || null
+			};
+
+			// Store selected days as JSON for weekly recurrence
+			if (recurrenceType === 'weekly') {
+				taskData.recurrence_days = selectedDays;
+			}
+
+			const { error: insertError } = await supabase.from('tasks').insert([taskData]);
 			if (insertError) throw insertError;
 
 			success = true;
-			title = description = date = time = priorityLevel = tags = selectedCalendar = '';
+			title = description = date = priorityLevel = tags = selectedCalendar = '';
+			hour = '12';
+			minute = '00';
+			period = 'PM';
 			recurrenceType = '';
-			recurrenceInterval = 1;
+			selectedDays = [];
 			recurrenceEnd = '';
 			setTimeout(() => goto('/calendar'), 1500);
 		} catch (err: any) {
@@ -129,6 +172,23 @@
 
 	function goBack() {
 		goto('/calendar');
+	}
+
+	// Quick select options for days
+	function selectWeekdays() {
+		selectedDays = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'];
+	}
+
+	function selectWeekend() {
+		selectedDays = ['saturday', 'sunday'];
+	}
+
+	function selectAllDays() {
+		selectedDays = daysOfWeek.map(d => d.value);
+	}
+
+	function clearDays() {
+		selectedDays = [];
 	}
 </script>
 
@@ -170,28 +230,68 @@
 
 				<div class="form-group full-width">
 					<!-- svelte-ignore a11y_label_has_associated_control -->
-					<!-- svelte-ignore a11y_label_has_associated_control -->
 					<label>Description</label>
 					<textarea bind:value={description} placeholder="Optional" rows="4" class="form-textarea"></textarea>
 				</div>
 
+				<div class="form-group full-width">
 					<!-- svelte-ignore a11y_label_has_associated_control -->
-					<!-- svelte-ignore a11y_label_has_associated_control -->
-				<div class="form-group">
 					<label>Date <span class="required">*</span></label>
-					<input type="date" bind:value={date} min={getCurrentDate()} class="form-input" />
+					<div class="date-picker-wrapper">
+						<input type="date" bind:value={date} min={getCurrentDate()} class="date-input" id="date-picker" />
+						<label for="date-picker" class="date-display">
+							<svg class="calendar-icon" width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+								<path d="M6.66667 1.66669V4.16669M13.3333 1.66669V4.16669M2.5 7.50002H17.5M4.16667 3.33335H15.8333C16.7538 3.33335 17.5 4.07955 17.5 5.00002V16.6667C17.5 17.5872 16.7538 18.3334 15.8333 18.3334H4.16667C3.24619 18.3334 2.5 17.5872 2.5 16.6667V5.00002C2.5 4.07955 3.24619 3.33335 4.16667 3.33335Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+							</svg>
+							<span class="date-text">
+								{#if date}
+									{new Date(date + 'T00:00').toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+								{:else}
+									Select a date
+								{/if}
+							</span>
+						</label>
+					</div>
 				</div>
 
-					<!-- svelte-ignore a11y_label_has_associated_control -->
-					<!-- svelte-ignore a11y_label_has_associated_control -->
 				<div class="form-group">
+					<!-- svelte-ignore a11y_label_has_associated_control -->
 					<label>Time <span class="required">*</span></label>
-					<input type="time" bind:value={time} min={minTime} class="form-input" />
+					<div class="time-picker">
+						<div class="time-input-group">
+							<select bind:value={hour} class="time-select">
+								{#each Array(12) as _, i}
+									<option value={String(i + 1).padStart(2, '0')}>{String(i + 1).padStart(2, '0')}</option>
+								{/each}
+							</select>
+							<span class="time-separator">:</span>
+							<select bind:value={minute} class="time-select">
+								{#each ['00', '15', '30', '45'] as min}
+									<option value={min}>{min}</option>
+								{/each}
+							</select>
+						</div>
+						<div class="period-selector">
+							<button 
+								type="button"
+								class="period-btn {period === 'AM' ? 'active' : ''}"
+								on:click={() => period = 'AM'}
+							>
+								AM
+							</button>
+							<button 
+								type="button"
+								class="period-btn {period === 'PM' ? 'active' : ''}"
+								on:click={() => period = 'PM'}
+							>
+								PM
+							</button>
+						</div>
+					</div>
 				</div>
 
-					<!-- svelte-ignore a11y_label_has_associated_control -->
-				<!-- svelte-ignore a11y_label_has_associated_control -->
 				<div class="form-group">
+					<!-- svelte-ignore a11y_label_has_associated_control -->
 					<label>Priority <span class="required">*</span></label>
 					<select bind:value={priorityLevel} class="form-select">
 						<option value="" disabled selected>Select priority</option>
@@ -201,35 +301,52 @@
 					</select>
 				</div>
 
-					<!-- svelte-ignore a11y_label_has_associated_control -->
-					<!-- svelte-ignore a11y_label_has_associated_control -->
 				<div class="form-group">
+					<!-- svelte-ignore a11y_label_has_associated_control -->
 					<label>Tags <span class="label-hint">(comma-separated)</span></label>
 					<input type="text" bind:value={tags} placeholder="work, urgent" class="form-input" />
 				</div>
 
+				<div class="form-group full-width">
 					<!-- svelte-ignore a11y_label_has_associated_control -->
-				<!-- svelte-ignore a11y_label_has_associated_control -->
-				<div class="form-group">
 					<label>Recurrence</label>
 					<select bind:value={recurrenceType} class="form-select">
 						<option value="">Does not repeat</option>
 						<option value="daily">Daily</option>
-						<option value="weekly">Weekly</option>
+						<option value="weekly">Weekly (select days below)</option>
 						<option value="monthly">Monthly</option>
 						<option value="yearly">Yearly</option>
 					</select>
 				</div>
 
-				{#if recurrenceType}
-					<!-- svelte-ignore a11y_label_has_associated_control -->
-					<!-- svelte-ignore a11y_label_has_associated_control -->
-					<div class="form-group">
-						<label>Repeat every <span class="label-hint">(interval)</span></label>
-						<input type="number" min="1" bind:value={recurrenceInterval} class="form-input" />
-					</div>
+				{#if recurrenceType === 'weekly'}
+					<div class="form-group full-width">
 						<!-- svelte-ignore a11y_label_has_associated_control -->
-					<div class="form-group">
+						<label>Repeat on <span class="required">*</span></label>
+						<div class="quick-select-buttons">
+							<button type="button" class="quick-btn" on:click={selectWeekdays}>Weekdays</button>
+							<button type="button" class="quick-btn" on:click={selectWeekend}>Weekend</button>
+							<button type="button" class="quick-btn" on:click={selectAllDays}>All Days</button>
+							<button type="button" class="quick-btn clear" on:click={clearDays}>Clear</button>
+						</div>
+						<div class="day-selector">
+							{#each daysOfWeek as day}
+								<button
+									type="button"
+									class="day-btn {selectedDays.includes(day.value) ? 'selected' : ''}"
+									on:click={() => toggleDay(day.value)}
+								>
+									<span class="day-short">{day.short}</span>
+									<span class="day-full">{day.label}</span>
+								</button>
+							{/each}
+						</div>
+					</div>
+				{/if}
+
+				{#if recurrenceType}
+					<div class="form-group full-width">
+						<!-- svelte-ignore a11y_label_has_associated_control -->
 						<label>End Date <span class="label-hint">(optional)</span></label>
 						<input type="date" bind:value={recurrenceEnd} min={getCurrentDate()} class="form-input" />
 					</div>
@@ -395,6 +512,192 @@
 		padding-right: 2.5rem;
 	}
 
+	/* Date Picker Styles */
+	.date-picker-wrapper {
+		position: relative;
+	}
+
+	.date-input {
+		position: absolute;
+		opacity: 0;
+		pointer-events: none;
+		width: 0;
+		height: 0;
+	}
+
+	.date-display {
+		display: flex;
+		align-items: center;
+		gap: 0.75rem;
+		padding: 1rem 1.25rem;
+		border: 2px solid #e5e7eb;
+		border-radius: 12px;
+		background: white;
+		cursor: pointer;
+		transition: all 0.2s ease;
+		font-weight: 500;
+		color: #374151;
+	}
+
+	.date-display:hover {
+		border-color: #d8a15c;
+		background: #fffaf1;
+	}
+
+	.date-input:focus + .date-display {
+		border-color: #d8a15c;
+		box-shadow: 0 0 0 3px rgba(216, 161, 92, 0.1);
+	}
+
+	.calendar-icon {
+		color: #d8a15c;
+		flex-shrink: 0;
+	}
+
+	.date-text {
+		font-size: 1rem;
+		flex: 1;
+	}
+
+	/* Time Picker Styles */
+	.time-picker {
+		display: flex;
+		gap: 0.75rem;
+		align-items: center;
+	}
+
+	.time-input-group {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+		flex: 1;
+	}
+
+	.time-select {
+		padding: 0.75rem 0.5rem;
+		border-radius: 8px;
+		border: 2px solid #e5e7eb;
+		font-size: 1.1rem;
+		font-weight: 600;
+		appearance: none;
+		background-image: url("data:image/svg+xml,%3Csvg width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5L6 6.5L11 1.5' stroke='%236b7280' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+		background-repeat: no-repeat;
+		background-position: right 0.5rem center;
+		padding-right: 2rem;
+		cursor: pointer;
+		flex: 1;
+	}
+
+	.time-separator {
+		font-size: 1.5rem;
+		font-weight: 700;
+		color: #374151;
+	}
+
+	.period-selector {
+		display: flex;
+		flex-direction: column;
+		gap: 0.25rem;
+	}
+
+	.period-btn {
+		padding: 0.5rem 0.75rem;
+		border: 2px solid #e5e7eb;
+		background: white;
+		border-radius: 6px;
+		cursor: pointer;
+		font-weight: 600;
+		font-size: 0.85rem;
+		transition: all 0.2s ease;
+		color: #6b7280;
+	}
+
+	.period-btn:hover {
+		border-color: #d8a15c;
+		color: #323e55;
+	}
+
+	.period-btn.active {
+		background: #323e55;
+		color: white;
+		border-color: #323e55;
+	}
+
+	/* Day Selector Styles */
+	.quick-select-buttons {
+		display: flex;
+		gap: 0.5rem;
+		margin-bottom: 0.75rem;
+		flex-wrap: wrap;
+	}
+
+	.quick-btn {
+		padding: 0.5rem 0.75rem;
+		border: 2px solid #e5e7eb;
+		background: white;
+		border-radius: 6px;
+		cursor: pointer;
+		font-size: 0.85rem;
+		font-weight: 500;
+		transition: all 0.2s ease;
+		color: #374151;
+	}
+
+	.quick-btn:hover {
+		border-color: #d8a15c;
+		background: #fffaf1;
+	}
+
+	.quick-btn.clear {
+		border-color: #fca5a5;
+		color: #dc2626;
+	}
+
+	.quick-btn.clear:hover {
+		background: #fef2f2;
+		border-color: #dc2626;
+	}
+
+	.day-selector {
+		display: grid;
+		grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+		gap: 0.75rem;
+	}
+
+	.day-btn {
+		padding: 0.75rem;
+		border: 2px solid #e5e7eb;
+		background: white;
+		border-radius: 8px;
+		cursor: pointer;
+		transition: all 0.2s ease;
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		gap: 0.25rem;
+	}
+
+	.day-btn:hover {
+		border-color: #d8a15c;
+		background: #fffaf1;
+	}
+
+	.day-btn.selected {
+		background: #323e55;
+		border-color: #323e55;
+		color: white;
+	}
+
+	.day-short {
+		font-weight: 700;
+		font-size: 1rem;
+	}
+
+	.day-full {
+		font-size: 0.75rem;
+		opacity: 0.8;
+	}
+
 	label {
 		font-weight: 600;
 		font-size: 0.9rem;
@@ -463,7 +766,6 @@
 		border: 1px solid #bbf7d0;
 	}
 
-
 	@media (max-width: 768px) {
 		.calendar-page {
 			flex-direction: column;
@@ -485,6 +787,16 @@
 		}
 		.btn {
 			width: 100%;
+		}
+		.day-selector {
+			grid-template-columns: repeat(auto-fit, minmax(80px, 1fr));
+		}
+		.time-picker {
+			flex-direction: column;
+			align-items: stretch;
+		}
+		.period-selector {
+			flex-direction: row;
 		}
 	}
 </style>
