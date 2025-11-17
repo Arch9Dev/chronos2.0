@@ -19,23 +19,23 @@
         
         <div class="disclaimer-text">
           <p>
-            Thank you for your interest in Chronos. We appreciate you taking the time to explore our application.
+            Thank you for your interest in Chronos. I appreciate you taking the time to explore our application.
           </p>
           
           <p>
-            <strong>Please note:</strong> Chronos is a university project created for educational purposes as part of our academic coursework. This application is <strong>not intended for commercial use</strong> and has <strong>no monetary value</strong>.
+            <strong>Please note:</strong> Chronos is a university project created for educational purposes as part of my academic coursework. This application is <strong>not intended for commercial use</strong> and has <strong>no monetary value</strong>.
           </p>
           
           <p>
-            While we've designed pricing tiers to demonstrate a complete product experience, no actual payments will be processed, and no charges will be incurred. All features are available for evaluation and testing purposes only.
+            While I've designed pricing tiers to demonstrate a complete product experience, no actual payments will be processed, and no charges will be incurred. All features are available for evaluation and testing purposes only.
           </p>
           
           <p>
-            This project serves as a demonstration of our technical skills, design capabilities, and understanding of modern web application development. We hope you find it useful and informative.
+            This project serves as a demonstration of my technical skills, design capabilities, and understanding of modern web application development. I hope you find it useful and informative.
           </p>
           
           <p class="disclaimer-note">
-            If you have any questions about this project, please feel free to contact us through the contact form on our main page.
+            If you have any questions about this project, please feel free to contact me through the contact form on the main page.
           </p>
         </div>
         
