@@ -156,12 +156,20 @@
 		if (!selectedTask) return;
 		if (!confirm('Are you sure you want to delete this task?')) return;
 
-		// Remove from UI immediately
-		tasks = tasks.filter((t) => t.id !== selectedTask.id);
-		applyFilters();
-
 		// Store deleted task for undo
 		const taskToDelete = selectedTask;
+
+		// Delete from Supabase immediately
+		const { error: deleteError } = await supabase.from('tasks').delete().eq('id', taskToDelete.id);
+
+		if (deleteError) {
+			alert('Error deleting task: ' + deleteError.message);
+			return;
+		}
+
+		// Remove from UI
+		tasks = tasks.filter((t) => t.id !== selectedTask.id);
+		applyFilters();
 
 		// Close the modal
 		showModal = false;
@@ -169,8 +177,7 @@
 
 		showUndo = true;
 		const timeoutId = setTimeout(() => {
-			// Permanently delete from Supabase after 5 seconds
-			supabase.from('tasks').delete().eq('id', taskToDelete.id);
+			// Remove from undo list after 5 seconds
 			deletedTasks = deletedTasks.filter((t) => t.task.id !== taskToDelete.id);
 			if (deletedTasks.length === 0) showUndo = false;
 		}, 5000);
@@ -182,18 +189,23 @@
 		if (!confirm('Are you sure you want to delete ALL tasks?')) return;
 
 		// Keep a backup for undo
-		deletedTasks = tasks.map((task) => ({ task, timeoutId: null }));
+		const tasksToDelete = [...tasks];
+		deletedTasks = tasksToDelete.map((task) => ({ task, timeoutId: null }));
 
-		// Remove all tasks from UI immediately
+		// Delete all tasks from Supabase immediately
+		for (const task of tasksToDelete) {
+			await supabase.from('tasks').delete().eq('id', task.id);
+		}
+
+		// Remove all tasks from UI
 		tasks = [];
 		applyFilters();
 
 		showUndo = true;
 
-		// Schedule permanent deletion from Supabase after 5 seconds
+		// Schedule cleanup of undo list after 5 seconds
 		for (const item of deletedTasks) {
-			item.timeoutId = setTimeout(async () => {
-				await supabase.from('tasks').delete().eq('id', item.task.id);
+			item.timeoutId = setTimeout(() => {
 				deletedTasks = deletedTasks.filter((t) => t.task.id !== item.task.id);
 				if (deletedTasks.length === 0) showUndo = false;
 			}, 5000);
@@ -210,12 +222,53 @@
 
 			const { task, timeoutId } = deletedTasks[index];
 			clearTimeout(timeoutId);
+
+			// Re-insert into Supabase
+			const { error: insertError } = await supabase.from('tasks').insert([
+				{
+					id: task.id,
+					user_id: user.id,
+					title: task.title,
+					description: task.description,
+					deadline: task.deadline,
+					priority: task.priority,
+					completed: task.completed,
+					tags: task.tags,
+					recurrence_type: task.recurrence_type,
+					recurrence_interval: task.recurrence_interval,
+					recurrence_end: task.recurrence_end
+				}
+			]);
+
+			if (insertError) {
+				alert('Error restoring task: ' + insertError.message);
+				return;
+			}
+
 			tasks = [...tasks, task];
 			deletedTasks.splice(index, 1);
 		} else {
 			// Undo all pending deletions
 			for (const { task, timeoutId } of deletedTasks) {
 				clearTimeout(timeoutId);
+
+				// Re-insert into Supabase
+				await supabase.from('tasks').insert([
+					{
+						id: task.id,
+						user_id: user.id,
+						title: task.title,
+						description: task.description,
+						deadline: task.deadline,
+						priority: task.priority,
+						completed: task.completed,
+						tags: task.tags,
+						recurrence_type: task.recurrence_type,
+						recurrence_interval: task.recurrence_interval,
+						recurrence_end: task.recurrence_end
+					}
+				]);
+
 				tasks = [...tasks, task];
 			}
 			deletedTasks = [];
@@ -326,9 +379,8 @@
 							<button
 								class="complete"
 								on:click={() => toggleCompleted(task.id, !task.completed)}
-								disabled={task.completed}
 							>
-								{task.completed ? 'Completed' : 'Mark Complete'}
+								{task.completed ? 'Mark Incomplete' : 'Mark Complete'}
 							</button>
 						</div>
 					</li>
@@ -624,9 +676,8 @@
 		background: #16a34a;
 		color: white;
 	}
-	button.complete:disabled {
-		opacity: 0.6;
-		cursor: not-allowed;
+	button.complete:hover {
+		background: #15803d;
 	}
 
 	.empty {
