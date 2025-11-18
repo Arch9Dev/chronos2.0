@@ -17,7 +17,6 @@
 	let period = 'PM';
 	let priorityLevel = '';
 	let tags = '';
-	let selectedCalendar = '';
 	let calendars: any[] = [];
 
 	// Recurrence fields
@@ -83,11 +82,6 @@
 			error = fetchError.message;
 			return;
 		}
-
-		calendars = calendarsData || [];
-		if (calendars.length > 0) {
-			selectedCalendar = calendars[0].id;
-		}
 	});
 
 	function toggleDay(day: string) {
@@ -139,7 +133,6 @@
 				deadline: deadline.toISOString(),
 				priority: priorityLevel,
 				tags: tags.split(',').map((t) => t.trim()).filter(Boolean),
-				calendar_id: selectedCalendar || null,
 				completed: false,
 				created_at: new Date().toISOString(),
 				recurrence_type: recurrenceType || null,
@@ -155,7 +148,7 @@
 			if (insertError) throw insertError;
 
 			success = true;
-			title = description = date = priorityLevel = tags = selectedCalendar = '';
+			title = description = date = priorityLevel = tags;
 			hour = '12';
 			minute = '00';
 			period = 'PM';
@@ -252,8 +245,8 @@
 							</select>
 							<span class="time-separator">:</span>
 							<select bind:value={minute} class="time-select">
-								{#each ['00', '15', '30', '45'] as min}
-									<option value={min}>{min}</option>
+								{#each Array(60) as _, i}
+									<option value={String(i).padStart(2, '0')}>{String(i).padStart(2, '0')}</option>
 								{/each}
 							</select>
 						</div>
@@ -284,17 +277,6 @@
 						<option value="low">Low</option>
 						<option value="medium">Medium</option>
 						<option value="high">High</option>
-					</select>
-				</div>
-
-				<div class="form-group">
-					<!-- svelte-ignore a11y_label_has_associated_control -->
-					<label>Calendar</label>
-					<select bind:value={selectedCalendar} class="form-select">
-						<option value="">No calendar</option>
-						{#each calendars as calendar}
-							<option value={calendar.id}>{calendar.name}</option>
-						{/each}
 					</select>
 				</div>
 
