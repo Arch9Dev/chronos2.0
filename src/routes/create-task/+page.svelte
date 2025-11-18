@@ -12,6 +12,7 @@
 	let title = '';
 	let description = '';
 	let date = '';
+	let displayDate = '';
 	let hour = '12';
 	let minute = '00';
 	let period = 'PM';
@@ -23,6 +24,7 @@
 	let recurrenceType: string = '';
 	let selectedDays: string[] = [];
 	let recurrenceEnd: string = '';
+	let displayRecurrenceEnd = '';
 
 	const daysOfWeek = [
 		{ value: 'monday', label: 'Monday', short: 'Mon' },
@@ -38,6 +40,18 @@
 	function getCurrentDate() {
 		const now = new Date();
 		return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+	}
+
+	function formatDateToDDMMYYYY(dateString: string) {
+		if (!dateString) return '';
+		const [year, month, day] = dateString.split('-');
+		return `${day}/${month}/${year}`;
+	}
+
+	function formatDateToYYYYMMDD(dateString: string) {
+		if (!dateString) return '';
+		const [day, month, year] = dateString.split('/');
+		return `${year}-${month}-${day}`;
 	}
 
 	function getNext30Minutes() {
@@ -61,6 +75,7 @@
 	onMount(async () => {
 		// Set defaults
 		date = getCurrentDate();
+		displayDate = formatDateToDDMMYYYY(date);
 		const defaultTime = getNext30Minutes();
 		hour = defaultTime.hour;
 		minute = defaultTime.minute;
@@ -101,6 +116,18 @@
 		
 		const dt = new Date(`${date}T${String(hour24).padStart(2, '0')}:${minute}`);
 		return isNaN(dt.getTime()) ? null : dt;
+	}
+
+	function handleDateInput(e: Event) {
+		const input = e.target as HTMLInputElement;
+		displayDate = input.value;
+		date = formatDateToYYYYMMDD(input.value);
+	}
+
+	function handleRecurrenceEndInput(e: Event) {
+		const input = e.target as HTMLInputElement;
+		displayRecurrenceEnd = input.value;
+		recurrenceEnd = formatDateToYYYYMMDD(input.value);
 	}
 
 	async function handleSubmit() {
@@ -155,6 +182,8 @@
 			recurrenceType = '';
 			selectedDays = [];
 			recurrenceEnd = '';
+			displayDate = '';
+			displayRecurrenceEnd = '';
 			setTimeout(() => goto('/calendar'), 1500);
 		} catch (err: any) {
 			error = err?.message || 'Failed to create task';
@@ -230,7 +259,13 @@
 				<div class="form-group full-width">
 					<!-- svelte-ignore a11y_label_has_associated_control -->
 					<label>Date <span class="required">*</span></label>
-					<input type="date" bind:value={date} min={getCurrentDate()} class="form-input" />
+					<input 
+						type="text" 
+						bind:value={displayDate} 
+						on:input={handleDateInput}
+						placeholder="DD/MM/YYYY" 
+						class="form-input" 
+					/>
 				</div>
 
 				<div class="form-group">
@@ -292,42 +327,22 @@
 					<select bind:value={recurrenceType} class="form-select">
 						<option value="">Does not repeat</option>
 						<option value="daily">Daily</option>
-						<option value="weekly">Weekly (select days below)</option>
+						<option value="weekly">Weekly</option>
 						<option value="monthly">Monthly</option>
 						<option value="yearly">Yearly</option>
 					</select>
 				</div>
-
-				{#if recurrenceType === 'weekly'}
-					<div class="form-group full-width">
-						<!-- svelte-ignore a11y_label_has_associated_control -->
-						<label>Repeat on <span class="required">*</span></label>
-						<div class="quick-select-buttons">
-							<button type="button" class="quick-btn" on:click={selectWeekdays}>Weekdays</button>
-							<button type="button" class="quick-btn" on:click={selectWeekend}>Weekend</button>
-							<button type="button" class="quick-btn" on:click={selectAllDays}>All Days</button>
-							<button type="button" class="quick-btn clear" on:click={clearDays}>Clear</button>
-						</div>
-						<div class="day-selector">
-							{#each daysOfWeek as day}
-								<button
-									type="button"
-									class="day-btn {selectedDays.includes(day.value) ? 'selected' : ''}"
-									on:click={() => toggleDay(day.value)}
-								>
-									<span class="day-short">{day.short}</span>
-									<span class="day-full">{day.label}</span>
-								</button>
-							{/each}
-						</div>
-					</div>
-				{/if}
-
 				{#if recurrenceType}
 					<div class="form-group full-width">
 						<!-- svelte-ignore a11y_label_has_associated_control -->
 						<label>End Date <span class="label-hint">(optional)</span></label>
-						<input type="date" bind:value={recurrenceEnd} min={getCurrentDate()} class="form-input" />
+						<input 
+							type="text" 
+							bind:value={displayRecurrenceEnd} 
+							on:input={handleRecurrenceEndInput}
+							placeholder="DD/MM/YYYY" 
+							class="form-input" 
+						/>
 					</div>
 				{/if}
 			</div>
