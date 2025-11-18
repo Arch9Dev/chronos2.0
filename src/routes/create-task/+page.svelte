@@ -237,21 +237,7 @@
 				<div class="form-group full-width">
 					<!-- svelte-ignore a11y_label_has_associated_control -->
 					<label>Date <span class="required">*</span></label>
-					<div class="date-picker-wrapper">
-						<input type="date" bind:value={date} min={getCurrentDate()} class="date-input" id="date-picker" />
-						<label for="date-picker" class="date-display">
-							<svg class="calendar-icon" width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-								<path d="M6.66667 1.66669V4.16669M13.3333 1.66669V4.16669M2.5 7.50002H17.5M4.16667 3.33335H15.8333C16.7538 3.33335 17.5 4.07955 17.5 5.00002V16.6667C17.5 17.5872 16.7538 18.3334 15.8333 18.3334H4.16667C3.24619 18.3334 2.5 17.5872 2.5 16.6667V5.00002C2.5 4.07955 3.24619 3.33335 4.16667 3.33335Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-							</svg>
-							<span class="date-text">
-								{#if date}
-									{new Date(date + 'T00:00').toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
-								{:else}
-									Select a date
-								{/if}
-							</span>
-						</label>
-					</div>
+					<input type="date" bind:value={date} min={getCurrentDate()} class="form-input" />
 				</div>
 
 				<div class="form-group">
@@ -298,6 +284,17 @@
 						<option value="low">Low</option>
 						<option value="medium">Medium</option>
 						<option value="high">High</option>
+					</select>
+				</div>
+
+				<div class="form-group">
+					<!-- svelte-ignore a11y_label_has_associated_control -->
+					<label>Calendar</label>
+					<select bind:value={selectedCalendar} class="form-select">
+						<option value="">No calendar</option>
+						{#each calendars as calendar}
+							<option value={calendar.id}>{calendar.name}</option>
+						{/each}
 					</select>
 				</div>
 
@@ -510,53 +507,6 @@
 		background-repeat: no-repeat;
 		background-position: right 1rem center;
 		padding-right: 2.5rem;
-	}
-
-	/* Date Picker Styles */
-	.date-picker-wrapper {
-		position: relative;
-	}
-
-	.date-input {
-		position: absolute;
-		opacity: 0;
-		pointer-events: none;
-		width: 0;
-		height: 0;
-	}
-
-	.date-display {
-		display: flex;
-		align-items: center;
-		gap: 0.75rem;
-		padding: 1rem 1.25rem;
-		border: 2px solid #e5e7eb;
-		border-radius: 12px;
-		background: white;
-		cursor: pointer;
-		transition: all 0.2s ease;
-		font-weight: 500;
-		color: #374151;
-	}
-
-	.date-display:hover {
-		border-color: #d8a15c;
-		background: #fffaf1;
-	}
-
-	.date-input:focus + .date-display {
-		border-color: #d8a15c;
-		box-shadow: 0 0 0 3px rgba(216, 161, 92, 0.1);
-	}
-
-	.calendar-icon {
-		color: #d8a15c;
-		flex-shrink: 0;
-	}
-
-	.date-text {
-		font-size: 1rem;
-		flex: 1;
 	}
 
 	/* Time Picker Styles */
