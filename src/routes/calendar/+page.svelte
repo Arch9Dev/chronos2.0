@@ -155,23 +155,10 @@
 
 		const days: { date: Date; tasks: any[]; currentMonth: boolean }[] = [];
 
-		// Previous month padding
-		for (let i = 0; i < startDay; i++) {
-			const date = new Date(year, month, i - startDay + 1);
-			days.push({ date, tasks: getTasksForDate(date), currentMonth: false });
-		}
-
 		// Current month
 		for (let d = 1; d <= daysInMonth; d++) {
 			const dateObj = new Date(year, month, d);
 			days.push({ date: dateObj, tasks: getTasksForDate(dateObj), currentMonth: true });
-		}
-
-		// Next month padding
-		const totalCells = Math.ceil(days.length / 7) * 7;
-		for (let i = days.length; i < totalCells; i++) {
-			const date = new Date(year, month, i - startDay + 1);
-			days.push({ date, tasks: getTasksForDate(date), currentMonth: false });
 		}
 
 		return days;
@@ -337,12 +324,7 @@
 
 	<section class="calendar-content">
 		<header class="calendar-controls">
-			<button class="nav-btn" on:click={() => changeDate(-1)}>← Prev</button>
 			<h2 class="month-label">{getViewTitle()}</h2>
-			<div class="nav-btn-group">
-				<button class="nav-btn" on:click={() => changeDate(1)}>Next →</button>
-				<button class="nav-btn today-btn" on:click={() => (currentDate = new Date())}>TODAY</button>
-			</div>
 		</header>
 
 		<!-- View Mode Selector -->

@@ -19,7 +19,7 @@
         
         <div class="disclaimer-text">
           <p>
-            Thank you for your interest in Chronos. I appreciate you taking the time to explore our application.
+            Thank you for your interest in Chronos. I appreciate you taking the time to explore my application.
           </p>
           
           <p>
