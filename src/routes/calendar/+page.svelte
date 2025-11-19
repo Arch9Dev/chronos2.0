@@ -13,10 +13,6 @@
 	let showModal = false;
 	let newPriority = '';
 	let newDeadline = '';
-	let newDescription = '';
-
-	// View mode: 'year', 'month', 'week', 'day'
-	let viewMode: 'year' | 'month' | 'week' | 'day' = 'month';
 
 	// Recurrence fields
 	let newRecurrenceType = '';
@@ -25,10 +21,7 @@
 
 	// Fetch current user and tasks
 	onMount(async () => {
-		const {
-			data: { user: currentUser },
-			error: authError
-		} = await supabase.auth.getUser();
+		const { data: { user: currentUser }, error: authError } = await supabase.auth.getUser();
 		if (authError || !currentUser) {
 			goto('/login');
 			return;
@@ -58,16 +51,8 @@
 		return date.toLocaleString('default', { month: 'long', year: 'numeric' });
 	}
 
-	function changeDate(offset: number) {
-		if (viewMode === 'year') {
-			currentDate = new Date(currentDate.getFullYear() + offset, 0, 1);
-		} else if (viewMode === 'month') {
-			currentDate = new Date(currentDate.getFullYear(), currentDate.getMonth() + offset, 1);
-		} else if (viewMode === 'week') {
-			currentDate = new Date(currentDate.getTime() + offset * 7 * 24 * 60 * 60 * 1000);
-		} else if (viewMode === 'day') {
-			currentDate = new Date(currentDate.getTime() + offset * 24 * 60 * 60 * 1000);
-		}
+	function changeMonth(offset: number) {
+		currentDate = new Date(currentDate.getFullYear(), currentDate.getMonth() + offset, 1);
 	}
 
 	function isToday(date: Date) {
@@ -114,37 +99,7 @@
 		return occurrences;
 	}
 
-	// Get tasks for a specific date
-	function getTasksForDate(date: Date) {
-		const year = date.getFullYear();
-		const month = date.getMonth();
-		const day = date.getDate();
-
-		return tasks.filter((t) => {
-			if (!t.deadline) return false;
-			const taskDate = new Date(t.deadline);
-
-			// Direct match
-			if (
-				taskDate.getFullYear() === year &&
-				taskDate.getMonth() === month &&
-				taskDate.getDate() === day
-			)
-				return true;
-
-			// Recurring match
-			const occurrences = generateOccurrences(
-				t,
-				new Date(year, month, day),
-				new Date(year, month, day, 23, 59, 59)
-			);
-			return occurrences.some(
-				(occ) => occ.getFullYear() === year && occ.getMonth() === month && occ.getDate() === day
-			);
-		});
-	}
-
-	// Build calendar days for month view
+	// Build calendar days
 	function getCalendarDays() {
 		const year = currentDate.getFullYear();
 		const month = currentDate.getMonth();
@@ -155,92 +110,62 @@
 
 		const days: { date: Date; tasks: any[]; currentMonth: boolean }[] = [];
 
+		// Previous month padding
+		for (let i = 0; i < startDay; i++) {
+			const date = new Date(year, month, i - startDay + 1);
+			days.push({ date, tasks: [], currentMonth: false });
+		}
+
 		// Current month
 		for (let d = 1; d <= daysInMonth; d++) {
 			const dateObj = new Date(year, month, d);
-			days.push({ date: dateObj, tasks: getTasksForDate(dateObj), currentMonth: true });
-		}
 
-		return days;
-	}
-
-	// Get week days
-	function getWeekDays() {
-		const startOfWeek = new Date(currentDate);
-		startOfWeek.setDate(currentDate.getDate() - currentDate.getDay());
-
-		const days = [];
-		for (let i = 0; i < 7; i++) {
-			const date = new Date(startOfWeek);
-			date.setDate(startOfWeek.getDate() + i);
-			days.push({ date, tasks: getTasksForDate(date) });
-		}
-		return days;
-	}
-
-	// Get year months
-	function getYearMonths() {
-		const year = currentDate.getFullYear();
-		const months = [];
-
-		for (let m = 0; m < 12; m++) {
-			const monthDate = new Date(year, m, 1);
-			const lastDay = new Date(year, m + 1, 0);
-			const daysInMonth = lastDay.getDate();
-
-			const monthTasks = tasks.filter((t) => {
+			const dayTasks = tasks.filter((t) => {
 				if (!t.deadline) return false;
 				const taskDate = new Date(t.deadline);
-				return taskDate.getFullYear() === year && taskDate.getMonth() === m;
+
+				// Direct match
+				if (
+					taskDate.getFullYear() === year &&
+					taskDate.getMonth() === month &&
+					taskDate.getDate() === d
+				) return true;
+
+				// Recurring match
+				const occurrences = generateOccurrences(
+					t,
+					new Date(year, month, 1),
+					new Date(year, month + 1, 0)
+				);
+				return occurrences.some(
+					occ => occ.getFullYear() === year && occ.getMonth() === month && occ.getDate() === d
+				);
 			});
 
-			months.push({
-				name: monthDate.toLocaleString('default', { month: 'short' }),
-				date: monthDate,
-				taskCount: monthTasks.length
-			});
+			days.push({ date: dateObj, tasks: dayTasks, currentMonth: true });
 		}
-		return months;
+
+		// Next month padding
+		const totalCells = Math.ceil(days.length / 7) * 7;
+		for (let i = days.length; i < totalCells; i++) {
+			const date = new Date(year, month, i - startDay + 1);
+			days.push({ date, tasks: [], currentMonth: false });
+		}
+
+		return days;
 	}
 
-	function getViewTitle() {
-		if (viewMode === 'year') {
-			return currentDate.getFullYear().toString();
-		} else if (viewMode === 'month') {
-			return getMonthName(currentDate);
-		} else if (viewMode === 'week') {
-			const startOfWeek = new Date(currentDate);
-			startOfWeek.setDate(currentDate.getDate() - currentDate.getDay());
-			const endOfWeek = new Date(startOfWeek);
-			endOfWeek.setDate(startOfWeek.getDate() + 6);
-			return `${startOfWeek.toLocaleDateString('default', { month: 'short', day: 'numeric' })} - ${endOfWeek.toLocaleDateString('default', { month: 'short', day: 'numeric', year: 'numeric' })}`;
-		} else {
-			return currentDate.toLocaleDateString('default', {
-				weekday: 'long',
-				month: 'long',
-				day: 'numeric',
-				year: 'numeric'
-			});
-		}
-	}
-
-	$: calendarDays = viewMode === 'month' && tasks ? getCalendarDays() : [];
-	$: weekDays = viewMode === 'week' && tasks ? getWeekDays() : [];
-	$: yearMonths = viewMode === 'year' && tasks ? getYearMonths() : [];
-	$: dayTasks = viewMode === 'day' && tasks ? getTasksForDate(currentDate) : [];
+	$: calendarDays = tasks && currentDate ? getCalendarDays() : [];
 
 	// Open modal for editing
 	function openEdit(task: any) {
 		selectedTask = { ...task };
 		newPriority = task.priority;
 		newDeadline = task.deadline ? new Date(task.deadline).toISOString().slice(0, 16) : '';
-		newDescription = task.description || '';
 
 		newRecurrenceType = task.recurrence_type || '';
 		newRecurrenceInterval = task.recurrence_interval || 1;
-		newRecurrenceEnd = task.recurrence_end
-			? new Date(task.recurrence_end).toISOString().slice(0, 10)
-			: '';
+		newRecurrenceEnd = task.recurrence_end ? new Date(task.recurrence_end).toISOString().slice(0, 10) : '';
 
 		showModal = true;
 	}
@@ -252,7 +177,6 @@
 		const { error: updateError } = await supabase
 			.from('tasks')
 			.update({
-				description: newDescription,
 				priority: newPriority,
 				deadline: newDeadline,
 				recurrence_type: newRecurrenceType || null,
@@ -270,13 +194,12 @@
 			t.id === selectedTask.id
 				? {
 						...t,
-						description: newDescription,
 						priority: newPriority,
 						deadline: newDeadline,
 						recurrence_type: newRecurrenceType,
 						recurrence_interval: newRecurrenceInterval,
 						recurrence_end: newRecurrenceEnd
-					}
+				  }
 				: t
 		);
 		showModal = false;
@@ -297,11 +220,6 @@
 		showModal = false;
 		selectedTask = null;
 		tasks = [...tasks.filter((t) => t.id !== deletedTaskId)];
-	}
-
-	function switchToMonth(monthIndex: number) {
-		currentDate = new Date(currentDate.getFullYear(), monthIndex, 1);
-		viewMode = 'month';
 	}
 </script>
 
@@ -324,177 +242,67 @@
 
 	<section class="calendar-content">
 		<header class="calendar-controls">
-			<h2 class="month-label">{getViewTitle()}</h2>
+			<button class="nav-btn" on:click={() => changeMonth(-1)}>← Prev</button>
+			<h2 class="month-label">{getMonthName(currentDate)}</h2>
+			<div class="nav-btn-group">
+				<button class="nav-btn" on:click={() => changeMonth(1)}>Next →</button>
+				<button class="nav-btn today-btn" on:click={() => (currentDate = new Date())}>TODAY</button>
+			</div>
 		</header>
-
-		<!-- View Mode Selector -->
-		<div class="view-selector">
-			<button
-				class="view-btn {viewMode === 'year' ? 'active' : ''}"
-				on:click={() => (viewMode = 'year')}>Year</button
-			>
-			<button
-				class="view-btn {viewMode === 'month' ? 'active' : ''}"
-				on:click={() => (viewMode = 'month')}>Month</button
-			>
-			<button
-				class="view-btn {viewMode === 'week' ? 'active' : ''}"
-				on:click={() => (viewMode = 'week')}>Week</button
-			>
-			<button
-				class="view-btn {viewMode === 'day' ? 'active' : ''}"
-				on:click={() => (viewMode = 'day')}>Day</button
-			>
-		</div>
 
 		{#if loading}
 			<div class="loading">Loading calendar...</div>
 		{:else if error}
 			<div class="error">{error}</div>
 		{:else}
-			<!-- YEAR VIEW -->
-			{#if viewMode === 'year'}
-				<section class="year-container">
-					<div class="year-grid">
-						{#each yearMonths as month}
-							<button class="month-card" on:click={() => switchToMonth(month.date.getMonth())}>
-								<h3>{month.name}</h3>
-								<div class="task-count">
-									{month.taskCount}
-									{month.taskCount === 1 ? 'task' : 'tasks'}
-								</div>
-							</button>
-						{/each}
-					</div>
-				</section>
-			{/if}
+			<section class="calendar-container">
+				<div class="calendar-header-row">
+					{#each ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as day}
+						<div class="weekday">{day}</div>
+					{/each}
+				</div>
 
-			<!-- MONTH VIEW -->
-			{#if viewMode === 'month'}
-				<section class="calendar-container">
-					<div class="calendar-header-row">
-						{#each ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as day}
-							<div class="weekday">{day}</div>
-						{/each}
-					</div>
+				<div class="calendar-grid">
+					{#each calendarDays as day}
+						<div
+							class="day-cell {isToday(day.date) ? 'today' : ''} {day.currentMonth
+								? ''
+								: 'other-month'}"
+						>
+							<div class="date">{day.date.getDate()}</div>
 
-					<div class="calendar-grid">
-						{#each calendarDays as day}
-							<div
-								class="day-cell {isToday(day.date) ? 'today' : ''} {day.currentMonth
-									? ''
-									: 'other-month'}"
-							>
-								<div class="date">{day.date.getDate()}</div>
-
-								{#if day.currentMonth && day.tasks.length > 0}
-									<ul class="task-list">
-										{#each day.tasks.slice(0, 3) as task}
-											<li>
-												<button
-													class="task-item {task.priority} {task.completed ? 'done' : ''}"
-													type="button"
-													on:click={() => openEdit(task)}
-												>
-													{task.title}
-												</button>
-											</li>
-										{/each}
-										{#if day.tasks.length > 3}
-											<li class="task-more">+{day.tasks.length - 3} more</li>
-										{/if}
-									</ul>
-								{/if}
-							</div>
-						{/each}
-					</div>
-				</section>
-			{/if}
-
-			<!-- WEEK VIEW -->
-			{#if viewMode === 'week'}
-				<section class="week-container">
-					<div class="week-grid">
-						{#each weekDays as day}
-							<div class="week-day {isToday(day.date) ? 'today' : ''}">
-								<div class="week-day-header">
-									<div class="day-name">
-										{day.date.toLocaleDateString('default', { weekday: 'short' })}
-									</div>
-									<div class="day-number">{day.date.getDate()}</div>
-								</div>
-								<div class="week-tasks">
-									{#if day.tasks.length > 0}
-										{#each day.tasks as task}
+							{#if day.currentMonth && day.tasks.length > 0}
+								<ul class="task-list">
+									{#each day.tasks.slice(0, 3) as task}
+										<li>
 											<button
-												class="week-task-item {task.priority}"
+												class="task-item {task.priority} {task.completed ? 'done' : ''}"
+												type="button"
 												on:click={() => openEdit(task)}
 											>
-												<div class="task-time">
-													{new Date(task.deadline).toLocaleTimeString('default', {
-														hour: '2-digit',
-														minute: '2-digit'
-													})}
-												</div>
-												<div class="task-title">{task.title}</div>
+												{task.title}
 											</button>
-										{/each}
-									{:else}
-										<div class="no-tasks">No tasks</div>
+										</li>
+									{/each}
+									{#if day.tasks.length > 3}
+										<li class="task-more">+{day.tasks.length - 3} more</li>
 									{/if}
-								</div>
-							</div>
-						{/each}
-					</div>
-				</section>
-			{/if}
-
-			<!-- DAY VIEW -->
-			{#if viewMode === 'day'}
-				<section class="day-container">
-					<div class="day-tasks-list">
-						{#if dayTasks.length > 0}
-							{#each dayTasks as task}
-								<button class="day-task-card {task.priority}" on:click={() => openEdit(task)}>
-									<div class="day-task-header">
-										<h3>{task.title}</h3>
-										<span class="priority-badge">{task.priority}</span>
-									</div>
-									{#if task.description}
-										<p class="day-task-description">{task.description}</p>
-									{/if}
-									<div class="day-task-time">
-										⏰ {new Date(task.deadline).toLocaleTimeString('default', {
-											hour: '2-digit',
-											minute: '2-digit'
-										})}
-									</div>
-								</button>
-							{/each}
-						{:else}
-							<div class="no-tasks-message">
-								<p>No tasks scheduled for this day</p>
-							</div>
-						{/if}
-					</div>
-				</section>
-			{/if}
+								</ul>
+							{/if}
+						</div>
+					{/each}
+				</div>
+			</section>
 		{/if}
 	</section>
 
 	{#if showModal}
 		<!-- svelte-ignore a11y_no_static_element_interactions -->
 		<!-- svelte-ignore a11y_click_events_have_key_events -->
+		<!-- svelte-ignore a11y_click_events_have_key_events -->
 		<div class="modal-overlay" on:click={() => (showModal = false)}>
 			<div class="modal" on:click|stopPropagation>
 				<h2>{selectedTask.title}</h2>
-
-				<div class="form-group">
-					<!-- svelte-ignore a11y_label_has_associated_control -->
-					<label>Description:</label>
-					<textarea bind:value={newDescription} rows="4" placeholder="Optional description"
-					></textarea>
-				</div>
 
 				<div class="form-group">
 					<!-- svelte-ignore a11y_label_has_associated_control -->
@@ -512,20 +320,21 @@
 					<input type="datetime-local" bind:value={newDeadline} />
 				</div>
 
-				<div class="form-group">
 					<!-- svelte-ignore a11y_label_has_associated_control -->
+				<div class="form-group">
 					<label>Recurrence:</label>
 					<select bind:value={newRecurrenceType}>
 						<option value="">Does not repeat</option>
 						<option value="daily">Daily</option>
 						<option value="weekly">Weekly</option>
-						<option value="weekly">Monthly</option>
+						<option value="monthly">Monthly</option>
 						<option value="yearly">Yearly</option>
 					</select>
 				</div>
 
 				{#if newRecurrenceType}
 					<!-- svelte-ignore a11y_label_has_associated_control -->
+						<!-- svelte-ignore a11y_label_has_associated_control -->
 					<div class="form-group">
 						<label>Repeat every (interval):</label>
 						<input type="number" min="1" bind:value={newRecurrenceInterval} />
@@ -533,11 +342,7 @@
 					<div class="form-group">
 						<!-- svelte-ignore a11y_label_has_associated_control -->
 						<label>End Date (optional):</label>
-						<input
-							type="date"
-							bind:value={newRecurrenceEnd}
-							min={newDeadline ? newDeadline.slice(0, 10) : ''}
-						/>
+						<input type="date" bind:value={newRecurrenceEnd} min={newDeadline ? newDeadline.slice(0,10) : ''} />
 					</div>
 				{/if}
 
@@ -550,6 +355,7 @@
 		</div>
 	{/if}
 </main>
+
 
 <style>
 	:global(*) {
@@ -642,7 +448,7 @@
 		color: #323e55;
 		padding: 1rem 2rem;
 		border-radius: 16px;
-		margin-bottom: 1rem;
+		margin-bottom: 2rem;
 		box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
 	}
 
@@ -678,41 +484,6 @@
 		background: #2a3648;
 	}
 
-	/* View Selector */
-	.view-selector {
-		display: flex;
-		gap: 0.5rem;
-		margin-bottom: 1.5rem;
-		justify-content: center;
-		background: #2a3648;
-		padding: 0.5rem;
-		border-radius: 12px;
-		width: fit-content;
-		margin-left: auto;
-		margin-right: auto;
-	}
-
-	.view-btn {
-		background: transparent;
-		color: #f6d7b0;
-		border: none;
-		padding: 0.5rem 1.5rem;
-		border-radius: 8px;
-		cursor: pointer;
-		font-weight: 600;
-		transition: all 0.3s ease;
-	}
-
-	.view-btn:hover {
-		background: rgba(216, 161, 92, 0.2);
-	}
-
-	.view-btn.active {
-		background: #d8a15c;
-		color: #323e55;
-	}
-
-	/* MONTH VIEW */
 	.calendar-container {
 		background: #ffffff;
 		border-radius: 16px;
@@ -743,8 +514,10 @@
 		grid-template-rows: repeat(6, 1fr);
 		border-top: 1px solid #eee;
 		flex-grow: 1;
-		height: calc(100vh - 300px);
+		height: calc(100vh - 250px);
 		min-height: 600px;
+		max-height: 80vh;
+		transition: height 0.3s ease;
 	}
 
 	.day-cell {
@@ -821,255 +594,114 @@
 		background: #f0f0f0;
 	}
 
-	/* YEAR VIEW */
-	.year-container {
-		background: #ffffff;
-		border-radius: 16px;
-		box-shadow: 0 10px 40px rgba(0, 0, 0, 0.25);
-		padding: 2rem;
-		color: #323e55;
-	}
-
-	.year-grid {
-		display: grid;
-		grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-		gap: 1.5rem;
-	}
-
-	.month-card {
-		background: linear-gradient(135deg, #f6d7b0 0%, #d8a15c 100%);
-		border: none;
-		border-radius: 12px;
-		padding: 2rem;
-		cursor: pointer;
-		transition: all 0.3s ease;
-		box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-		text-align: center;
-	}
-
-	.month-card:hover {
-		transform: translateY(-4px);
-		box-shadow: 0 6px 20px rgba(0, 0, 0, 0.2);
-	}
-
-	.month-card h3 {
-		color: #323e55;
-		font-size: 1.5rem;
-		margin-bottom: 0.5rem;
-	}
-
-	.task-count {
-		color: #2a3648;
-		font-weight: 600;
-		font-size: 0.9rem;
-	}
-
-	/* WEEK VIEW */
-	.week-container {
-		background: #ffffff;
-		border-radius: 16px;
-		box-shadow: 0 10px 40px rgba(0, 0, 0, 0.25);
-		padding: 1.5rem;
-		color: #323e55;
-		flex-grow: 1;
-	}
-
-	.week-grid {
-		display: grid;
-		grid-template-columns: repeat(7, 1fr);
-		gap: 1rem;
-	}
-
-	.week-day {
-		background: #fafafa;
-		padding: 1rem;
-		border-radius: 10px;
-		box-shadow: inset 0 0 0 1px #eee;
-	}
-
-	.week-day.today {
-		box-shadow: inset 0 0 0 2px #d8a15c;
-		background: #fffaf1;
-	}
-
-	.week-day-header {
-		display: flex;
-		justify-content: space-between;
-		margin-bottom: 0.5rem;
-		font-weight: 600;
-	}
-
-	.week-tasks {
-		display: flex;
-		flex-direction: column;
-		gap: 0.5rem;
-	}
-
-	.week-task-item {
-		border: none;
-		padding: 0.5rem;
-		background: #fff;
-		border-radius: 8px;
-		box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
-		cursor: pointer;
-		text-align: left;
-	}
-
-	.week-task-item.low {
-		background: #e0f2fe;
-		color: #0369a1;
-	}
-	.week-task-item.medium {
-		background: #fef9c3;
-		color: #92400e;
-	}
-	.week-task-item.high {
-		background: #fee2e2;
-		color: #991b1b;
-	}
-
-	.no-tasks {
-		font-size: 0.85rem;
-		color: #777;
-	}
-
-	/* DAY VIEW */
-	.day-container {
-		background: #ffffff;
-		border-radius: 16px;
-		box-shadow: 0 10px 40px rgba(0, 0, 0, 0.25);
-		padding: 1.5rem;
-		color: #323e55;
-		flex-grow: 1;
-	}
-
-	.day-tasks-list {
-		display: flex;
-		flex-direction: column;
-		gap: 1rem;
-	}
-
-	.day-task-card {
-		background: #fff;
-		padding: 1rem;
-		border-radius: 12px;
-		box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-		text-align: left;
-		border: none;
-		cursor: pointer;
-	}
-
-	.day-task-card.low {
-		border-left: 6px solid #60a5fa;
-	}
-	.day-task-card.medium {
-		border-left: 6px solid #facc15;
-	}
-	.day-task-card.high {
-		border-left: 6px solid #ef4444;
-	}
-
-	.day-task-header {
-		display: flex;
-		justify-content: space-between;
-		margin-bottom: 0.5rem;
-	}
-
-	.priority-badge {
-		font-size: 0.8rem;
-		padding: 0.2rem 0.4rem;
-		background: #d8a15c;
-		border-radius: 6px;
-		color: #323e55;
-		font-weight: 600;
-	}
-
-	.day-task-description {
-		font-size: 0.9rem;
-		margin-bottom: 0.5rem;
-	}
-
-	.no-tasks-message {
-		text-align: center;
-		padding: 2rem;
-		opacity: 0.7;
-	}
-
-	/* MODAL */
 	.modal-overlay {
 		position: fixed;
-		top: 0;
-		left: 0;
-		width: 100%;
-		height: 100%;
-		background: rgba(0, 0, 0, 0.55);
+		inset: 0;
+		background: rgba(0, 0, 0, 0.6);
 		display: flex;
 		justify-content: center;
 		align-items: center;
 		z-index: 999;
+		backdrop-filter: blur(4px);
 	}
 
 	.modal {
 		background: #fff;
-		color: #323e55;
 		padding: 2rem;
-		width: 420px;
 		border-radius: 16px;
-		box-shadow: 0 4px 30px rgba(0, 0, 0, 0.25);
-	}
-
-	.modal h2 {
-		margin-bottom: 1rem;
+		max-width: 400px;
+		width: 90%;
+		box-shadow: 0 8px 30px rgba(0, 0, 0, 0.3);
+		color: #323e55;
 	}
 
 	.form-group {
 		margin-bottom: 1rem;
 	}
 
-	textarea,
-	input,
-	select {
+	.form-group label {
+		display: block;
+		margin-bottom: 0.5rem;
+		font-weight: 600;
+		color: #323e55;
+	}
+
+	.form-group select,
+	.form-group input {
 		width: 100%;
 		padding: 0.5rem;
+		border: 1px solid #d1d5db;
 		border-radius: 8px;
-		border: 1px solid #ccc;
-		background: #fdfdfd;
+		font-size: 1rem;
+		font-family: inherit;
+	}
+
+	.form-group select:focus,
+	.form-group input:focus {
+		outline: none;
+		border-color: #d8a15c;
+		box-shadow: 0 0 0 3px rgba(216, 161, 92, 0.1);
 	}
 
 	.modal-actions {
 		display: flex;
 		justify-content: space-between;
-		margin-top: 1.5rem;
+		margin-top: 1rem;
 	}
 
 	.modal-actions button {
-		padding: 0.5rem 1rem;
-		border-radius: 8px;
 		border: none;
+		border-radius: 8px;
+		padding: 0.5rem 1rem;
 		cursor: pointer;
 		font-weight: 600;
+		transition: all 0.2s ease;
 	}
 
-	.save {
-		background: #4ade80;
-		color: #fff;
-	}
-	.delete {
-		background: #ef4444;
-		color: #fff;
-	}
-	.cancel {
-		background: #e5e7eb;
-		color: #333;
+	button.save {
+		background: #16a34a;
+		color: white;
 	}
 
-	.save:hover {
-		background: #22c55e;
+	button.save:hover {
+		background: #15803d;
 	}
-	.delete:hover {
+
+	button.delete {
 		background: #dc2626;
+		color: white;
 	}
-	.cancel:hover {
-		background: #d1d5db;
+
+	button.delete:hover {
+		background: #b91c1c;
+	}
+
+	button.cancel {
+		background: #6b7280;
+		color: white;
+	}
+
+	button.cancel:hover {
+		background: #4b5563;
+	}
+
+	@keyframes fadeIn {
+		from {
+			opacity: 0;
+			transform: scale(0.95);
+		}
+		to {
+			opacity: 1;
+			transform: scale(1);
+		}
+	}
+
+	@media (max-width: 768px) {
+		.sidebar {
+			display: none;
+		}
+		.calendar-content {
+			padding: 1rem;
+		}
 	}
 </style>
